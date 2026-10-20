@@ -1,0 +1,502 @@
+[
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T06:44:36.090922+00:00",
+    "niche": "Power BI",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 15414.1,
+    "sources": [
+      {
+        "id": "power-bi",
+        "title": "Power BI editorial guide",
+        "content": "Keep examples grounded in common Power BI workflows: importing tabular data, shaping it in Power Query, modeling relationships, writing DAX measures, and designing readable reports. Distinguish Desktop authoring from Service sharing and mention licensing or refresh constraints when relevant. Beginner guides should end with a small practice task and should not imply that a tool alone guarantees a job."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "5 Essential DAX Formulas for Power BI Beginners in India",
+          "hook": "Master DAX formulas to unlock powerful insights in your reports",
+          "angle": "Power BI training and development for Indian students and freshers",
+          "target_keyword": "DAX formulas for beginners",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to DAX Formulas",
+              "summary": "DAX (Data Analysis Expressions) is a powerful formula language used in Power BI to create custom calculations and measures. In this article, we'll explore the five essential DAX formulas that every beginner should know."
+            },
+            {
+              "heading": "1. SUMMARIZECOLUMNS",
+              "summary": "The SUMMARIZECOLUMNS function allows you to summarize data across multiple columns while grouping by others. It's a versatile and powerful formula for creating reports with multiple metrics."
+            },
+            {
+              "heading": "2. FILTER",
+              "summary": "The FILTER function enables you to apply filters on your dataset, making it easier to extract specific information. This formula is essential for Power BI beginners who need to create dynamic reports."
+            },
+            {
+              "heading": "3. GROUPBY",
+              "summary": "GROUPBY allows you to group data by one or more columns while performing calculations on other columns. It's a crucial formula for creating reports with grouped data."
+            },
+            {
+              "heading": "4. ALLSELECTED",
+              "summary": "The ALLSELECTED function is used to select all the selected items in your report, making it easier to create dynamic visualizations. This formula helps beginners create interactive and engaging reports."
+            },
+            {
+              "heading": "5. CALCULATE",
+              "summary": "CALCULATE is a fundamental DAX formula that allows you to perform calculations on your dataset. It's essential for Power BI beginners who need to create custom measures."
+            },
+            {
+              "heading": "Conclusion and Practice Task",
+              "summary": "Mastering these five DAX formulas will give you a solid foundation in creating powerful insights in your reports. Try practicing each formula with sample data to solidify your understanding."
+            }
+          ]
+        },
+        "validation_errors": [],
+        "valid": true
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T07:15:29.598019+00:00",
+    "niche": "SQL",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 47990.54,
+    "sources": [
+      {
+        "id": "sql",
+        "title": "SQL editorial guide",
+        "content": "Use runnable, small examples and name the SQL dialect when syntax differs. Beginner material can progress from SELECT and filtering to joins, aggregation, subqueries, and window functions. Explain expected result shapes, NULL behavior, and common mistakes rather than presenting syntax lists without context."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "5 Essential SQL Interview Questions for Freshers in India",
+          "hook": "Ace your next SQL interview with these 5 must-ask questions!",
+          "angle": "Help students and freshers in India prepare for common SQL interview questions.",
+          "target_keyword": "SQL interview questions for freshers",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to SQL Interview Questions",
+              "summary": "In this article, we'll cover the top 5 SQL interview questions that are commonly asked by companies in India. We'll provide examples and tips on how to answer these questions."
+            },
+            {
+              "heading": "Question 1: What is Normalization?",
+              "summary": "This question assesses a candidate's understanding of database design principles. We'll provide an example of normalization and explain its importance in database design."
+            },
+            {
+              "heading": "Question 2: How Do You Optimize Query Performance?",
+              "summary": "This question tests a candidate's knowledge of query optimization techniques. We'll provide examples of how to optimize queries using indexes, joins, and subqueries."
+            },
+            {
+              "heading": "Question 3: What is the Difference Between INNER JOIN and LEFT JOIN?",
+              "summary": "This question evaluates a candidate's understanding of different types of joins in SQL. We'll provide an example of when to use each type of join."
+            },
+            {
+              "heading": "Question 4: How Do You Handle NULL Values in SQL?",
+              "summary": "This question assesses a candidate's ability to handle missing or null values in SQL queries. We'll provide examples of how to use the IS NULL and COALESCE functions."
+            },
+            {
+              "heading": "Question 5: Can You Explain Window Functions in SQL?",
+              "summary": "This question tests a candidate's understanding of window functions in SQL, such as ROW_NUMBER() and RANK(). We'll provide an example of how to use these functions to solve a common problem."
+            },
+            {
+              "heading": "Conclusion",
+              "summary": "In conclusion, mastering the 5 essential SQL interview questions covered in this article will help freshers in India stand out from the competition. Remember to practice answering these questions and provide examples to demonstrate your skills."
+            }
+          ]
+        },
+        "validation_errors": [],
+        "valid": true
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T06:38:07.931371+00:00",
+    "niche": "Data analytics",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 29209.1,
+    "sources": [
+      {
+        "id": "data-analytics",
+        "title": "Data analytics editorial guide",
+        "content": "Anchor analytics topics in a question, a dataset, and a decision. Distinguish descriptive, diagnostic, predictive, and prescriptive analysis without implying causation from correlation. Include data cleaning, assumptions, visualization choices, and a reproducible next step; avoid unsupported market and salary statistics."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "5 Essential Tips to Build a Strong Data Analytics Portfolio",
+          "hook": "Unlock your data analytics career by showcasing your skills in a well-crafted portfolio.",
+          "angle": "Helping students and freshers in India create a professional data analytics portfolio that stands out to potential employers.",
+          "target_keyword": "data analytics portfolio",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to Data Analytics Portfolios",
+              "summary": "A data analytics portfolio is a collection of projects that demonstrate your skills and experience in working with data. It's essential for students and freshers to create a strong portfolio to showcase their capabilities to potential employers."
+            },
+            {
+              "heading": "Tip 1: Choose Relevant Projects",
+              "summary": "Select projects that are relevant to the industry or company you're interested in. Make sure they demonstrate your skills in data cleaning, visualization, and analysis."
+            },
+            {
+              "heading": "Tip 2: Showcase Your Process",
+              "summary": "Include a clear explanation of your thought process and decision-making behind each project. This will help employers understand how you approach complex problems."
+            },
+            {
+              "heading": "Tip 3: Highlight Your Skills in Data Visualization",
+              "summary": "Use visualization tools to present complex data insights in an easily understandable format. Showcase your ability to communicate results effectively."
+            },
+            {
+              "heading": "Tip 4: Emphasize Your Problem-Solving Abilities",
+              "summary": "Highlight how you identified and solved problems using data analysis. This will demonstrate your ability to think critically and creatively."
+            },
+            {
+              "heading": "Tip 5: Make It Reproducible",
+              "summary": "Ensure that each project is reproducible, so employers can easily understand and verify the results. This will show your commitment to transparency and accountability."
+            },
+            {
+              "heading": "Conclusion",
+              "summary": "By following these tips, students and freshers in India can create a strong data analytics portfolio that showcases their skills and experience. Remember, it's not just about presenting data, but also about telling a story with your analysis."
+            }
+          ]
+        },
+        "validation_errors": [],
+        "valid": true
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T06:38:36.020176+00:00",
+    "niche": "Personal finance",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 28088.43,
+    "sources": [
+      {
+        "id": "personal-finance",
+        "title": "Personal finance editorial guide",
+        "content": "Use cautious, educational language and avoid individualized investment, tax, or legal advice. State assumptions, explain tradeoffs and risk, distinguish general information from professional advice, and never invent returns, rates, or guarantees. Make examples transparent and locally relevant when a country is specified."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "Mastering Personal Finance Basics for Students and Freshers in India",
+          "hook": "Take control of your finances with these essential personal finance basics that will set you up for success after college.",
+          "angle": "A comprehensive guide to help students and freshers in India understand the fundamentals of personal finance, covering budgeting, saving, investing, and managing debt.",
+          "target_keyword": "personal finance basics",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to Personal Finance Basics",
+              "summary": "This guide will introduce you to the essential concepts of personal finance, assuming no prior knowledge. By the end of this article, you'll understand how to manage your money effectively and make informed financial decisions."
+            },
+            {
+              "heading": "1. Creating a Budget: Prioritize Your Expenses",
+              "summary": "Learn how to categorize your expenses, prioritize essential spending, and create a budget that works for you."
+            },
+            {
+              "heading": "2. Saving Strategies: Short-Term and Long-Term Plans",
+              "summary": "Discover effective saving strategies for short-term goals (e.g., building an emergency fund) and long-term plans (e.g., retirement savings)."
+            },
+            {
+              "heading": "3. Understanding Investments: Stocks, Bonds, and More",
+              "summary": "Get familiar with basic investment concepts, including stocks, bonds, mutual funds, and exchange-traded funds (ETFs). Understand the risks and rewards associated with each option."
+            },
+            {
+              "heading": "4. Managing Debt: Strategies for Paying Off Loans",
+              "summary": "Learn how to manage high-interest debt, negotiate with creditors, and develop a plan to pay off loans efficiently."
+            },
+            {
+              "heading": "5. Building an Emergency Fund: Essential for Financial Security",
+              "summary": "Understand the importance of having an easily accessible savings fund in case of unexpected expenses or financial setbacks."
+            },
+            {
+              "heading": "Conclusion",
+              "summary": "By mastering these personal finance basics, you'll be well-equipped to handle your finances confidently and make informed decisions about your money."
+            }
+          ]
+        },
+        "validation_errors": [],
+        "valid": true
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T07:16:10.840024+00:00",
+    "niche": "Fitness",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 41236.9,
+    "sources": [
+      {
+        "id": "fitness",
+        "title": "Fitness editorial guide",
+        "content": "Use sustainable, inclusive examples that account for different experience and ability levels. Avoid guaranteed transformations, unsafe intensity claims, and unsupported health statistics. Encourage readers with injuries or health conditions to seek qualified professional guidance and explain how to adapt an exercise safely."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "Unlocking Fitness Success: Top 5 Essential Habits for Indian Students and Freshers",
+          "hook": "Are you tired of feeling sluggish and unproductive in college? Discover the top habits to transform your fitness journey!",
+          "angle": "Help Indian students and freshers prioritize their well-being amidst academic pressures",
+          "target_keyword": "fitness habits for students in India",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to Fitness Habits",
+              "summary": "In this article, we will explore the top essential habits that can help students and freshers establish a consistent fitness routine."
+            },
+            {
+              "heading": "1. Setting Realistic Goals and Expectations",
+              "summary": "Start by setting achievable goals, whether it's exercising for 30 minutes daily or attending yoga classes twice a week."
+            },
+            {
+              "heading": "2. Creating a Balanced Workout Routine",
+              "summary": "Combine cardio exercises with strength training and flexibility workouts to maintain overall fitness."
+            },
+            {
+              "heading": "3. Prioritizing Sleep and Nutrition",
+              "summary": "Ensure you get 7-8 hours of sleep and focus on consuming a balanced diet rich in whole foods, fruits, and vegetables."
+            },
+            {
+              "heading": "4. Finding Fitness Buddies and Support Systems",
+              "summary": "Join fitness groups or invite friends to work out together for motivation and accountability."
+            },
+            {
+              "heading": "5. Consistency and Patience: The Key to Long-Term Success",
+              "summary": "Stick to your routine even on busy days, and remember that progress takes time – be patient with your body's transformation."
+            },
+            {
+              "heading": "Conclusion: Empowering Students and Freshers through Fitness Habits",
+              "summary": "By incorporating these essential habits into their daily lives, students and freshers can unlock their full potential and thrive in college."
+            }
+          ]
+        },
+        "validation_errors": [
+          "Title must be 50-70 characters (currently 82)."
+        ],
+        "valid": false
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T07:16:53.627453+00:00",
+    "niche": "Interior design",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 42786.1,
+    "sources": [
+      {
+        "id": "interior-design",
+        "title": "Interior design editorial guide",
+        "content": "Turn design advice into a practical decision process: measure the space, identify constraints, set priorities, compare materials or layouts, and explain maintenance. Be clear when recommendations depend on climate, rental rules, accessibility, budget, or local availability. Do not claim a style or product universally increases property value."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "5 Budget-Friendly Ways to Revamp Your Student Accommodation",
+          "hook": "Transform your hostel room or PG into a cozy haven without breaking the bank!",
+          "angle": "Students and freshers in India can create their dream space within their budget constraints.",
+          "target_keyword": "budget-friendly interior design ideas for students",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction",
+              "summary": "As a student or fresher, living in accommodation with limited budget can be challenging. However, it doesn't mean you have to compromise on style and comfort."
+            },
+            {
+              "heading": "1. Declutter and Repurpose",
+              "summary": "Get rid of unnecessary items and reuse what you already have to create a sense of openness and calmness."
+            },
+            {
+              "heading": "2. Use Color Psychology",
+              "summary": "Choose colors that promote relaxation, energy, or focus depending on your needs and personality."
+            },
+            {
+              "heading": "3. Add Texture with Fabric",
+              "summary": "Use affordable fabric options like throw pillows, blankets, or rugs to add depth and visual interest."
+            },
+            {
+              "heading": "4. Create a Gallery Wall",
+              "summary": "Hang up your favorite quotes, photos, or artwork to make the space feel more personalized."
+            },
+            {
+              "heading": "5. Bring in Plants",
+              "summary": "Low-maintenance plants like succulents can purify the air and create a calming atmosphere."
+            },
+            {
+              "heading": "Conclusion",
+              "summary": "With these budget-friendly ideas, you can revamp your student accommodation into a cozy haven that reflects your personality and style."
+            }
+          ]
+        },
+        "validation_errors": [
+          "Title promises 5 items but outline does not enumerate all 5."
+        ],
+        "valid": false
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T07:17:51.138783+00:00",
+    "niche": "Cooking for beginners",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 57509.99,
+    "sources": [
+      {
+        "id": "editorial-basics",
+        "title": "Generic fallback: Editorial planning and SEO basics",
+        "content": "Generic fallback only: choose a specific target keyword and serve its search intent without promising rankings or traffic. A useful headline names its audience, practical outcome, and specificity; numbered promises must match the outline. Beginners need plain-language explanations and practical examples. Never invent statistics, research findings, guarantees, or industry-wide claims."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "Cooking Essentials for Students and Freshers in India",
+          "hook": "Master basic cooking skills to enjoy healthy meals on a tight budget as a student or fresher in India.",
+          "angle": "Discover essential cooking techniques, kitchen tools, and grocery shopping tips tailored specifically for students and freshers in India.",
+          "target_keyword": "basic cooking essentials for students",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction",
+              "summary": "As a student or fresher in India, cooking can be intimidating, but it's essential for saving money and eating healthy. This article provides a comprehensive guide to basic cooking essentials that you need to get started."
+            },
+            {
+              "heading": "1. Essential Cooking Techniques",
+              "summary": "Learn the fundamental techniques of cooking, including boiling, steaming, sautéing, and roasting. Practice these skills with simple recipes like scrambled eggs, toast, and vegetables."
+            },
+            {
+              "heading": "2. Kitchen Tools and Equipment",
+              "summary": "Invest in basic kitchen tools such as a frying pan, saucepan, utensils, and a cutting board. Understand how to use them effectively for various cooking tasks."
+            },
+            {
+              "heading": "3. Grocery Shopping Tips",
+              "summary": "Learn how to plan meals, make a grocery list, and shop within your budget. Familiarize yourself with Indian grocery stores and markets to find affordable ingredients."
+            },
+            {
+              "heading": "4. Basic Pantry Staples",
+              "summary": "Stock your pantry with essential ingredients like rice, lentils, spices, oils, and condiments. Understand how to use these staples in various recipes."
+            },
+            {
+              "heading": "5. Meal Planning and Prep",
+              "summary": "Develop a meal planning routine that suits your schedule and dietary preferences. Learn how to prep meals in advance for easy reheating and eating."
+            },
+            {
+              "heading": "Conclusion",
+              "summary": "Mastering basic cooking essentials takes time and practice, but it's essential for students and freshers in India to enjoy healthy meals on a tight budget."
+            }
+          ]
+        },
+        "validation_errors": [
+          "Idea does not clearly match the requested niche."
+        ],
+        "valid": false
+      }
+    ]
+  },
+  {
+    "source": "Recorded from llama3.1:8b via local Ollama",
+    "recorded_at": "2026-10-20T07:19:04.922417+00:00",
+    "niche": "Career development",
+    "audience": "students and freshers in India",
+    "mode": "ollama",
+    "model": "llama3.1:8b",
+    "latency_ms": 73780.52,
+    "sources": [
+      {
+        "id": "editorial-basics",
+        "title": "Generic fallback: Editorial planning and SEO basics",
+        "content": "Generic fallback only: choose a specific target keyword and serve its search intent without promising rankings or traffic. A useful headline names its audience, practical outcome, and specificity; numbered promises must match the outline. Beginners need plain-language explanations and practical examples. Never invent statistics, research findings, guarantees, or industry-wide claims."
+      }
+    ],
+    "ideas": [
+      {
+        "idea": {
+          "title": "5 Essential Career Development Skills for Freshers in India",
+          "hook": "Develop the skills that will give you an edge in the Indian job market.",
+          "angle": "Focus on skills that are highly valued by employers in India and can be applied to various industries.",
+          "target_keyword": "career development skills for freshers",
+          "search_intent": "informational",
+          "audience": "students and freshers in India",
+          "est_word_count": 800,
+          "format": "listicle",
+          "outline": [
+            {
+              "heading": "Introduction to Career Development Skills",
+              "summary": "Understanding the importance of career development skills for success in the Indian job market."
+            },
+            {
+              "heading": "Developing Essential Communication Skills",
+              "summary": "Learning how to effectively communicate with colleagues, managers, and clients is crucial for any role."
+            },
+            {
+              "heading": "Improving Time Management and Productivity",
+              "summary": "Mastering time management techniques will help you prioritize tasks, meet deadlines, and achieve goals."
+            },
+            {
+              "heading": "Building Strong Networking Skills",
+              "summary": "Learning to network effectively can lead to new opportunities, mentorship, and valuable connections in your industry."
+            },
+            {
+              "heading": "Developing Analytical and Problem-Solving Skills",
+              "summary": "Enhance your ability to collect data, analyze information, and make informed decisions to drive business results."
+            },
+            {
+              "heading": "Conclusion: Putting Career Development Skills into Practice",
+              "summary": "How to apply the skills learned in this article to achieve success in your career"
+            }
+          ]
+        },
+        "validation_errors": [
+          "Idea does not clearly address the requested audience."
+        ],
+        "valid": false
+      }
+    ]
+  }
+]

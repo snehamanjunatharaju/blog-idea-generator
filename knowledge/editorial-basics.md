@@ -1,0 +1,2 @@
+# Editorial planning and SEO basics
+Generic fallback only: choose a specific target keyword and serve its search intent without promising rankings or traffic. A useful headline names its audience, practical outcome, and specificity; numbered promises must match the outline. Beginners need plain-language explanations and practical examples. Never invent statistics, research findings, guarantees, or industry-wide claims.

@@ -111,7 +111,26 @@ textarea { width: 100%; resize: vertical; }
     .results-container { display: block !important; }
     .idea-card { break-inside: avoid; box-shadow: none; }
 }
-input:focus, select:focus { outline: 3px solid #d8e7ff; border-color: var(--brand); }
+input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible {
+    outline: 3px solid #d8e7ff;
+    outline-offset: 2px;
+    border-color: var(--brand);
+}
+
+.site-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 20px;
+    padding: 18px;
+    color: var(--muted);
+    font-size: .9rem;
+}
+
+.site-footer a, .info-content a { color: var(--brand-dark); }
+.info-content { padding: 28px 38px; }
+.info-content p { max-width: 72ch; }
+.info-page .site-header a { color: #fff; }
 
 button {
     min-height: 42px;
@@ -182,6 +201,7 @@ button:disabled { opacity: .65; cursor: wait; }
     .site-header { display: block; padding: 26px 22px; }
     .mode-badge { margin-top: 18px; }
     .form-container, .results-container, .metrics-panel { padding: 24px 20px; }
+    .info-content { padding: 24px 20px; }
     .form-grid, .idea-details { grid-template-columns: 1fr; }
     .results-heading { align-items: flex-start; flex-direction: column; }
     .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

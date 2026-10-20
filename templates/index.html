@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Create practical, structured blog briefs with quality checks.">
     <title>Blog Idea Generator</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', path='/favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
 </head>
 <body>
@@ -36,7 +37,7 @@
                         <label for="providerKey">Your provider key (optional)</label>
                         <input type="password" id="providerKey" autocomplete="off" maxlength="300"
                                placeholder="Used for this page session only">
-                        <small>Sent only with your request over HTTPS; never saved in browser storage or on this server.</small>
+                        <small>For Anthropic/OpenAI only. Sent with requests over HTTPS; never saved in browser storage or on this server.</small>
                     </div>
                     <div class="form-group">
                         <label for="audiencePreset">Audience preset</label>
@@ -99,6 +100,7 @@
                 </div>
                 <p class="muted">Bring-your-own-key requests are not charged against the shared Demo quota. Use only a provider you trust.</p>
                 <button type="submit" id="generateBtn">Generate briefs</button>
+                <p class="muted" id="browserHistoryNote">The last 10 result sets are saved locally in this browser only.</p>
             </form>
         </section>
 
@@ -109,6 +111,7 @@
                     <h2>Blog briefs</h2>
                 </div>
                 <div class="toolbar">
+                    <button type="button" class="button-secondary" id="restoreHistoryBtn">Restore last saved</button>
                     <button type="button" class="button-secondary" id="copyAllBtn">Copy all</button>
                     <button type="button" class="button-secondary" id="exportBtn">Export Markdown</button>
                     <button type="button" class="button-secondary" id="printBtn">Print</button>
@@ -126,7 +129,7 @@
             <div id="results" class="idea-list"></div>
             <section class="sources-panel" id="sourcesPanel" hidden>
                 <h3>Grounding notes</h3>
-                <p class="muted">These editorial references guide the format; they are not niche-specific research.</p>
+                <p class="muted">Editorial guidance for this niche; these notes are not external research or factual citations.</p>
                 <ul id="sources"></ul>
             </section>
         </section>
@@ -146,6 +149,14 @@
             <div id="providerMetrics" class="provider-metrics"></div>
         </section>
     </main>
+    <footer class="site-footer">
+        <a href="/about">About</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/disclaimer">Disclaimer</a>
+        <a href="https://github.com/snehamanjunatharaju/blog-idea-generator" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </footer>
 
     <script>
         const form = document.getElementById('ideaForm');
@@ -185,7 +196,9 @@
                 const response = await fetch('/mode');
                 if (!response.ok) return;
                 const data = await response.json();
-                document.getElementById('modeBadge').textContent = `${data.mode} · ${data.model}`;
+                if (!lastResponse) {
+                    document.getElementById('modeBadge').textContent = `${data.mode} · ${data.model}`;
+                }
                 document.getElementById('remainingRuns').textContent =
                     `${data.remaining_daily_runs} Demo runs left today`;
             } catch (error) {
@@ -204,7 +217,10 @@
                     ['Ideas checked', data.ideas],
                     ['Validation pass rate', `${(data.validation_pass_rate * 100).toFixed(0)}%`],
                     ['Average latency', `${data.avg_latency_ms.toFixed(2)} ms`],
-                    ['Near-duplicate rate', `${(data.avg_duplicate_rate * 100).toFixed(0)}%`]
+                    ['Near-duplicate rate', `${(data.avg_duplicate_rate * 100).toFixed(0)}%`],
+                    ['Prompt build', `${data.step_latency_ms.prompt.toFixed(2)} ms`],
+                    ['Provider calls', `${data.step_latency_ms.provider.toFixed(2)} ms`],
+                    ['Validation', `${data.step_latency_ms.validation.toFixed(2)} ms`]
                 ].forEach(([label, value]) => {
                     const item = document.createElement('div');
                     item.className = 'metric';
@@ -270,7 +286,7 @@
             startProgress();
             try {
                 ensureSecureKeyTransport();
-                const response = await fetch('/generate', requestOptions(new FormData(form)));
+                const response = await fetchWithTimeout('/generate', requestOptions(new FormData(form)));
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
                 lastResponse = data;
@@ -288,17 +304,34 @@
 
         function ensureSecureKeyTransport() {
             const localHost = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
-            if (providerKey && location.protocol !== 'https:' && !localHost) {
+            const selectedProvider = form.elements.provider.value;
+            const keyWillBeSent = providerKey && ['openai', 'anthropic'].includes(selectedProvider);
+            if (keyWillBeSent && location.protocol !== 'https:' && !localHost) {
                 throw new Error('Bring-your-own keys are sent only over HTTPS.');
             }
         }
 
         function requestOptions(body) {
+            const selectedProvider = form.elements.provider.value;
+            const keyWillBeSent = providerKey && ['openai', 'anthropic'].includes(selectedProvider);
             return {
                 method: 'POST',
                 body,
-                headers: providerKey ? { 'X-Provider-Key': providerKey } : {}
+                headers: keyWillBeSent ? { 'X-Provider-Key': providerKey } : {}
             };
+        }
+
+        async function fetchWithTimeout(url, options) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 100000);
+            try {
+                return await fetch(url, { ...options, signal: controller.signal });
+            } catch (error) {
+                if (error.name === 'AbortError') throw new Error('This request took too long. Please retry or choose another provider.');
+                throw error;
+            } finally {
+                clearTimeout(timer);
+            }
         }
 
         function saveBrowserHistory(data) {
@@ -457,11 +490,19 @@
             payload.set('feedback', feedbackOverride || result.validation_errors.join('; ') || 'Make the hook and angle more specific and distinct.');
             try {
                 ensureSecureKeyTransport();
-                const response = await fetch('/regenerate', requestOptions(payload));
+                const response = await fetchWithTimeout('/regenerate', requestOptions(payload));
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
                 lastResponse.ideas[index] = data.ideas[0];
-                results.replaceChildren(...lastResponse.ideas.map(renderIdea));
+                lastResponse.mode = data.mode;
+                lastResponse.model = data.model;
+                lastResponse.latency_ms = data.latency_ms;
+                lastResponse.validation_pass_rate =
+                    lastResponse.ideas.filter((item) => item.valid).length / Math.max(lastResponse.ideas.length, 1);
+                saveBrowserHistory(lastResponse);
+                renderResults(lastResponse);
+                refreshMetrics();
+                refreshMode();
             } catch (error) {
                 errorMessage.textContent = error.message;
                 errorMessage.hidden = false;
@@ -479,6 +520,7 @@
                 });
                 if (!response.ok) throw new Error('Feedback could not be saved.');
                 button.disabled = true;
+                refreshMetrics();
             } catch (error) {
                 errorMessage.textContent = error.message;
                 errorMessage.hidden = false;
@@ -528,7 +570,36 @@
         });
 
         document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-            localStorage.removeItem('blogIdeaHistory');
+            try {
+                localStorage.removeItem('blogIdeaHistory');
+                document.getElementById('browserHistoryNote').textContent = 'Browser history cleared from this device.';
+            } catch (error) {
+                errorMessage.textContent = 'Browser history could not be cleared in this browser.';
+                errorMessage.hidden = false;
+            }
+        });
+
+        document.getElementById('restoreHistoryBtn').addEventListener('click', () => {
+            try {
+                const history = JSON.parse(localStorage.getItem('blogIdeaHistory') || '[]');
+                if (!history.length) throw new Error('No saved browser history is available on this device.');
+                const saved = history[0];
+                lastResponse = {
+                    ideas: saved.ideas,
+                    sources: saved.sources,
+                    mode: 'Browser history',
+                    model: 'saved on this device',
+                    latency_ms: 0,
+                    validation_pass_rate: saved.ideas.filter((idea) => idea.valid).length / Math.max(saved.ideas.length, 1),
+                    duplicate_rate: 0
+                };
+                resultsContainer.hidden = false;
+                renderResults(lastResponse);
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
+                resultsContainer.hidden = false;
+            }
         });
 
         function downloadFile(content, filename, type) {

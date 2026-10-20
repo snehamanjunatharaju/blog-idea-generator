@@ -1,5 +1,6 @@
 import sqlite3
 
+import pytest
 from fastapi.testclient import TestClient
 from fastapi import HTTPException
 from types import SimpleNamespace
@@ -17,6 +18,25 @@ def test_homepage_displays_provider_and_brief_fields(monkeypatch):
     assert "freshers in India" in response.text
     assert "modeBadge" in response.text
     assert "Export Markdown" in response.text
+    assert "Privacy" in response.text
+    assert "Restore last saved" in response.text
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/privacy", "No account is required"),
+        ("/terms", "No ranking, traffic, revenue"),
+        ("/disclaimer", "not legal, medical, financial"),
+        ("/about", "structured, quality-checked briefs"),
+        ("/how-it-works", "Pydantic"),
+    ],
+)
+def test_information_pages_are_available(path, expected):
+    with TestClient(main.app) as client:
+        response = client.get(path)
+    assert response.status_code == 200
+    assert expected in response.text
 
 
 def test_generate_and_metrics_are_persisted(monkeypatch, tmp_path):
@@ -36,7 +56,8 @@ def test_generate_and_metrics_are_persisted(monkeypatch, tmp_path):
         body = response.json()
         assert len(body["ideas"]) == 3
         assert body["mode"] == "demo"
-        assert body["model"] == "built-in samples"
+        assert body["model"].startswith("recorded from llama3.1:8b")
+        assert set(body["step_latency_ms"]) == {"prompt_ms", "provider_ms", "validation_ms"}
         assert body["sources"]
         regenerated = client.post(
             "/regenerate",
@@ -54,6 +75,7 @@ def test_generate_and_metrics_are_persisted(monkeypatch, tmp_path):
         assert metrics["runs"] == 2
         assert metrics["ideas"] == 4
         assert metrics["validation_pass_rate"] == 1
+        assert set(metrics["step_latency_ms"]) == {"prompt", "provider", "validation"}
         assert metrics["by_model_and_tone"][0]["model"] == "built-in samples"
 
 
@@ -62,6 +84,18 @@ def test_input_limits_are_enforced(monkeypatch):
     with TestClient(main.app) as client:
         response = client.post("/generate", data={"niche": "x" * 121})
     assert response.status_code == 422
+
+
+def test_abusive_prompt_terms_are_rejected():
+    with TestClient(main.app) as client:
+        response = client.post("/generate", data={"niche": "kill yourself"})
+    assert response.status_code == 422
+    with TestClient(main.app) as client:
+        notes_response = client.post(
+            "/generate",
+            data={"niche": "SQL", "extra_notes": "how to make a bomb"},
+        )
+    assert notes_response.status_code == 422
 
 
 def test_requests_are_rate_limited_per_ip(monkeypatch):
@@ -149,6 +183,19 @@ def test_optional_writer_constraints_are_passed_to_generation(monkeypatch, tmp_p
     assert captured["target_keyword"] == "SQL interview questions"
     assert captured["est_word_count"] == 1500
     assert captured["extra_notes"] == "Use beginner-friendly examples."
+
+
+def test_invalid_provider_output_is_not_written_to_logs(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "invalid-output.sqlite3"))
+
+    async def invalid_output(*_args, **_kwargs):
+        raise ValueError("private generated text")
+
+    monkeypatch.setattr(main, "generate_ideas", invalid_output)
+    with TestClient(main.app) as client:
+        response = client.post("/generate", data={"niche": "SQL"})
+    assert response.status_code == 502
+    assert "private generated text" not in caplog.text
 
 
 def test_demo_daily_cap_rejects_more_requests(tmp_path, monkeypatch):

@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -6,6 +7,7 @@ import idea_engine
 from idea_engine import (
     BlogIdea,
     FORMATS,
+    Provider,
     _parse_ideas,
     _prompt,
     _generate_batch,
@@ -13,6 +15,7 @@ from idea_engine import (
     generate_ideas,
     get_provider,
     lexical_similarity,
+    _duplicate_pairs,
     validate_idea,
 )
 from knowledge_base import retrieve_sources
@@ -126,10 +129,27 @@ def test_near_duplicate_ideas_have_high_similarity():
     assert lexical_similarity(original, near_duplicate) > 0.84
 
 
+def test_duplicate_target_keywords_are_detected_even_with_different_titles():
+    first = valid_idea()
+    second = valid_idea(
+        title="Power BI Portfolio Projects for Freshers in India",
+        target_keyword="POWER-BI for freshers",
+        angle="Build one small portfolio dashboard and explain its design choices.",
+    )
+    assert _duplicate_pairs([first, second], embeddings=None) == [(1, 0)]
+
+
 def test_knowledge_retrieval_returns_citations():
     sources = retrieve_sources("Power BI freshers")
     assert sources
     assert all({"id", "title", "content"} <= source.keys() for source in sources)
+    assert any("Power BI" in source["title"] for source in sources)
+
+
+def test_unknown_niche_uses_labelled_generic_fallback():
+    sources = retrieve_sources("underwater basket weaving")
+    assert sources
+    assert all(source["title"].startswith("Generic fallback:") for source in sources)
 
 
 def test_tone_changes_demo_output():
@@ -177,6 +197,87 @@ def test_bring_your_own_provider_key_is_held_only_by_provider_instance():
     assert provider.api_key == "test-key-never-persist"
 
 
+@pytest.mark.asyncio
+async def test_openai_byok_key_is_sent_only_to_provider_request(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {"choices": [{"message": {"content": '{"ideas": []}'}}]}
+
+    class FakeClient:
+        def __init__(self, **_kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_args):
+            return None
+
+        async def post(self, _url, headers, json):
+            captured.update(headers=headers, body=json)
+            return FakeResponse()
+
+    monkeypatch.setattr(idea_engine.httpx, "AsyncClient", FakeClient)
+    key = "short-lived-test-key"
+    await Provider("openai", key).generate("sample prompt")
+    assert captured["headers"]["Authorization"].endswith(key)
+    assert "short-lived-test-key" not in captured["body"]["messages"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_demo_can_load_a_recorded_sample_with_explicit_label(monkeypatch, tmp_path):
+    fixtures = tmp_path / "fixtures"
+    fixtures.mkdir()
+    (fixtures / "llama31_samples.json").write_text(
+        json.dumps(
+            [{
+                "niche": NICHE,
+                "audience": "students and freshers in India",
+                "ideas": [{"valid": True, "idea": valid_idea(
+                    title="Power BI for Freshers in India: Five Skills to Practice",
+                    audience="students and freshers in India",
+                ).model_dump()}],
+            }]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(idea_engine, "__file__", str(tmp_path / "idea_engine.py"))
+    prompt = _prompt(
+        NICHE, "freshers in India", "professional", ["listicle"], [], est_word_count=1200
+    )
+    provider = Provider("demo")
+    output = json.loads(await provider.generate(prompt))
+    assert provider.model.startswith("recorded from llama3.1:8b")
+    assert output["ideas"][0]["title"].startswith("Power BI for Freshers")
+
+
+def test_recorded_llama_fixtures_cover_eight_niches():
+    path = Path(idea_engine.__file__).resolve().parent / "fixtures" / "llama31_samples.json"
+    recordings = json.loads(path.read_text(encoding="utf-8"))
+    assert len(recordings) == 8
+    assert len({item["niche"] for item in recordings}) == 8
+    assert all(item["model"] == "llama3.1:8b" for item in recordings)
+    assert all(item["source"].startswith("Recorded from llama3.1:8b") for item in recordings)
+    assert all(
+        idea_engine._recorded_demo_ideas(
+            _prompt(
+                item["niche"],
+                "freshers in India",
+                "professional",
+                ["listicle"],
+                [],
+                est_word_count=1200,
+            )
+        )
+        for item in recordings
+    )
+
+
 def test_each_format_has_a_distinct_demo_outline():
     ideas = demo_ideas_from_prompt(_prompt(NICHE, AUDIENCE, "professional", list(FORMATS), []))
     assert len({idea["format"] for idea in ideas}) == len(FORMATS)
@@ -197,6 +298,10 @@ async def test_demo_generation_returns_distinct_valid_structured_ideas(monkeypat
     assert len(result.ideas) == 3
     assert len({item["idea"]["format"] for item in result.ideas}) == 3
     assert all(not item["validation_errors"] for item in result.ideas)
+    assert len({item["idea"]["target_keyword"].casefold() for item in result.ideas}) == 3
+    assert result.duplicate_rate == 0
+    assert set(result.step_timings) == {"prompt_ms", "provider_ms", "validation_ms"}
+    assert all(value >= 0 for value in result.step_timings.values())
 
 
 @pytest.mark.asyncio
@@ -232,3 +337,32 @@ async def test_reflection_regenerates_only_the_failing_idea(monkeypatch):
     assert calls[1][1] == ["listicle"]
     assert "50-70 characters" in calls[1][0]
     assert result.ideas[0]["valid"]
+
+
+@pytest.mark.asyncio
+async def test_duplicate_keyword_reflection_retries_only_duplicate_idea(monkeypatch):
+    first = valid_idea()
+    duplicate = valid_idea(
+        title="Power BI Portfolio Projects for Freshers in India Today",
+        target_keyword=first.target_keyword,
+        format="how-to",
+    )
+    improved = valid_idea(
+        title="How Freshers in India Build a Power BI Portfolio Dashboard",
+        hook="A first dashboard exercise using a small dataset to explain a practical decision.",
+        angle="Design one visual, check its limitations, and narrate the choices behind a Power BI dashboard.",
+        target_keyword="Power BI beginner dashboard portfolio",
+        format="how-to",
+    )
+    calls = []
+
+    async def fake_batch(_provider, prompt, formats):
+        calls.append((prompt, formats))
+        return [first, duplicate] if len(calls) == 1 else [improved]
+
+    monkeypatch.setattr(idea_engine, "_generate_batch", fake_batch)
+    result = await generate_ideas(NICHE, AUDIENCE, 2, "professional", provider_name="demo")
+    assert len(calls) > 1
+    assert all(formats == ["how-to"] for _, formats in calls[1:])
+    assert "too similar" in calls[1][0]
+    assert result.duplicate_rate == 0

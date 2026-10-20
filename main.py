@@ -31,7 +31,14 @@ DAILY_FREE_LIMIT = int(os.getenv("DAILY_FREE_RUNS", "500"))
 request_times: dict[str, deque[float]] = defaultdict(deque)
 request_lock = Lock()
 TONES = {"professional", "conversational", "humorous", "inspirational", "educational"}
-ABUSIVE_PROMPT_TERMS = ("kill yourself", "racial slur", "sexual violence")
+ABUSIVE_PROMPT_TERMS = (
+    "kill yourself",
+    "how to kill",
+    "racial slur",
+    "sexual violence",
+    "how to make a bomb",
+    "harm someone",
+)
 
 
 @asynccontextmanager
@@ -45,6 +52,74 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Blog Idea Generator", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+INFO_PAGES = {
+    "privacy": (
+        "Privacy",
+        [
+            "No account is required. Provider keys entered in the page remain in browser memory and are sent in the request header only; they are not written to server logs or SQLite.",
+            "The server stores aggregate run metrics, anonymous vote totals, and the shared Demo quota. It does not store prompts, generated ideas, provider keys, or IP addresses.",
+            "Optional browser history is stored in this browser's local storage. Use Clear browser history to remove it. Avoid entering personal or sensitive information in a brief.",
+            "Bring-your-own keys are allowed only over HTTPS on public hosts. Requests may still be processed by the selected provider under its own privacy policy.",
+        ],
+    ),
+    "terms": (
+        "Terms and disclaimer",
+        [
+            "This tool provides editorial brainstorming, not legal, medical, financial, employment, or SEO advice. Review generated material and verify claims before publication.",
+            "No ranking, traffic, revenue, job, or other outcome is guaranteed. Demo results are examples, not fresh model outputs.",
+            "You are responsible for the content and provider credentials you submit. Do not submit personal, confidential, or unlawful material.",
+        ],
+    ),
+    "about": (
+        "About",
+        [
+            "Blog Idea Generator turns a niche and audience into structured, quality-checked briefs with a hook, angle, target keyword, search intent, estimated length, and outline.",
+            "It supports Demo, local Ollama, Anthropic, and OpenAI modes. Demo mode is free and works without credentials.",
+        ],
+    ),
+    "how-it-works": (
+        "How it works",
+        [
+            "The app retrieves a small editorial note, asks the selected provider for structured JSON, validates the response with Pydantic, and runs rule-based checks for title length, outline structure, audience fit, duplicate ideas, and unsupported claims.",
+            "Failed checks can trigger a targeted retry. Sources shown with results are editorial guidance, not external research or citations.",
+            "Run metrics are aggregated in SQLite. Generated ideas and briefs are not stored server-side.",
+        ],
+    ),
+}
+
+
+def _info_page(request: Request, slug: str):
+    title, paragraphs = INFO_PAGES[slug]
+    return templates.TemplateResponse(
+        request=request,
+        name="info.html",
+        context={"page_title": title, "paragraphs": paragraphs},
+    )
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request):
+    return _info_page(request, "privacy")
+
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_page(request: Request):
+    return _info_page(request, "terms")
+
+
+@app.get("/disclaimer", response_class=HTMLResponse)
+async def disclaimer_page(request: Request):
+    return _info_page(request, "terms")
+
+
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    return _info_page(request, "about")
+
+
+@app.get("/how-it-works", response_class=HTMLResponse)
+async def how_it_works_page(request: Request):
+    return _info_page(request, "how-it-works")
 
 
 def _check_rate_limit(request: Request) -> None:
@@ -59,14 +134,15 @@ def _check_rate_limit(request: Request) -> None:
         recent.append(now)
 
 
-def _validate_fields(niche: str, audience: str, tone: str) -> None:
+def _validate_fields(niche: str, audience: str, tone: str, *extra_text: str) -> None:
     if not niche.strip():
         raise HTTPException(status_code=422, detail="Niche cannot be blank.")
     if not audience.strip():
         raise HTTPException(status_code=422, detail="Audience cannot be blank.")
     if tone not in TONES:
         raise HTTPException(status_code=422, detail="Choose a supported tone.")
-    if any(term in f"{niche} {audience}".lower() for term in ABUSIVE_PROMPT_TERMS):
+    brief_text = " ".join((niche, audience, *extra_text)).lower()
+    if any(term in brief_text for term in ABUSIVE_PROMPT_TERMS):
         raise HTTPException(status_code=422, detail="Please use a respectful niche and audience.")
 
 
@@ -77,6 +153,7 @@ def _response(result) -> dict:
         "mode": result.mode,
         "model": result.model,
         "latency_ms": result.latency_ms,
+        "step_latency_ms": result.step_timings,
         "validation_pass_rate": result.validation_pass_rate,
         "duplicate_rate": result.duplicate_rate,
         "remaining_daily_runs": max(0, DAILY_FREE_LIMIT - daily_runs()),
@@ -122,7 +199,7 @@ async def generate(
     api_key: str | None = Header(None, alias="X-Provider-Key"),
 ):
     _check_rate_limit(request)
-    _validate_fields(niche, audience, tone)
+    _validate_fields(niche, audience, tone, target_keyword, extra_notes)
     started = time.perf_counter()
     try:
         if api_key and (len(api_key) > 300 or "\n" in api_key or "\r" in api_key):
@@ -149,7 +226,7 @@ async def generate(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         raise HTTPException(status_code=502, detail="The provider could not complete this request. Please retry.") from exc
     except (ValidationError, ValueError) as exc:
-        logger.exception("Provider returned invalid idea data")
+        logger.error("Provider returned invalid idea data error_type=%s", type(exc).__name__)
         raise HTTPException(status_code=502, detail="Provider returned invalid idea data.") from exc
 
     elapsed = round((time.perf_counter() - started) * 1000, 2)
@@ -160,10 +237,19 @@ async def generate(
         latency_ms=elapsed,
         ideas=result.ideas,
         duplicate_rate=result.duplicate_rate,
+        step_timings=result.step_timings,
     )
     logger.info(
-        "generation_completed mode=%s model=%s count=%d latency_ms=%.2f pass_rate=%.2f duplicate_rate=%.2f",
-        result.mode, result.model, len(result.ideas), elapsed, result.validation_pass_rate, result.duplicate_rate,
+        "generation_completed mode=%s model=%s count=%d latency_ms=%.2f prompt_ms=%.2f provider_ms=%.2f validation_ms=%.2f pass_rate=%.2f duplicate_rate=%.2f",
+        result.mode,
+        result.model,
+        len(result.ideas),
+        elapsed,
+        result.step_timings.get("prompt_ms", 0),
+        result.step_timings.get("provider_ms", 0),
+        result.step_timings.get("validation_ms", 0),
+        result.validation_pass_rate,
+        result.duplicate_rate,
     )
     return _response(result)
 
@@ -182,7 +268,7 @@ async def regenerate(
     api_key: str | None = Header(None, alias="X-Provider-Key"),
 ):
     _check_rate_limit(request)
-    _validate_fields(niche, audience, tone)
+    _validate_fields(niche, audience, tone, feedback)
     try:
         selected_provider = get_provider(provider, api_key)
         if selected_provider.mode == "demo":
@@ -200,6 +286,9 @@ async def regenerate(
         if isinstance(exc, ProviderError):
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         raise HTTPException(status_code=502, detail="The provider could not complete this request. Please retry.") from exc
+    except (ValidationError, ValueError) as exc:
+        logger.error("Regenerated idea data was invalid error_type=%s", type(exc).__name__)
+        raise HTTPException(status_code=502, detail="Provider returned invalid idea data.") from exc
     record_run(
         mode=result.mode,
         model=result.model,
@@ -207,6 +296,7 @@ async def regenerate(
         latency_ms=result.latency_ms,
         ideas=result.ideas,
         duplicate_rate=result.duplicate_rate,
+        step_timings=result.step_timings,
     )
     return _response(result)
 
@@ -216,7 +306,11 @@ async def get_metrics():
 
 
 @app.post("/feedback")
-async def submit_feedback(vote: Literal["up", "down"] = Form(...)):
+async def submit_feedback(
+    request: Request,
+    vote: Literal["up", "down"] = Form(...),
+):
+    _check_rate_limit(request)
     record_vote(vote)
     return {"ok": True}
 

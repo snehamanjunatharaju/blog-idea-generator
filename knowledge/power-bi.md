@@ -1,0 +1,2 @@
+# Power BI editorial guide
+Keep examples grounded in common Power BI workflows: importing tabular data, shaping it in Power Query, modeling relationships, writing DAX measures, and designing readable reports. Distinguish Desktop authoring from Service sharing and mention licensing or refresh constraints when relevant. Beginner guides should end with a small practice task and should not imply that a tool alone guarantees a job.

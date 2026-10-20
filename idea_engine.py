@@ -5,7 +5,7 @@ import os
 import re
 import time
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 import httpx
@@ -85,6 +85,7 @@ class GenerationResult:
     latency_ms: float
     validation_pass_rate: float
     duplicate_rate: float
+    step_timings: dict[str, float] = field(default_factory=dict)
 
 
 class ProviderError(RuntimeError):
@@ -100,6 +101,11 @@ class Provider:
 
     async def generate(self, prompt: str) -> str:
         if self.mode == "demo":
+            recorded = _recorded_demo_ideas(prompt)
+            if recorded is not None:
+                self.model = "recorded from llama3.1:8b + built-in examples"
+            else:
+                self.model = "built-in samples"
             return json.dumps({"ideas": demo_ideas_from_prompt(prompt)})
         if self.mode == "ollama":
             model = self.model or "llama3.2"
@@ -309,7 +315,11 @@ async def _generate_batch(provider: Provider, prompt: str, formats: list[str]) -
         try:
             return _parse_ideas(raw, formats)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
-            logger.info("Structured output attempt %d failed: %s", attempt + 1, exc)
+            logger.info(
+                "Structured output attempt %d failed error_type=%s",
+                attempt + 1,
+                type(exc).__name__,
+            )
             feedback = f"Your previous output was invalid: {exc}. Return corrected valid JSON."
     raise ProviderError("The model did not return valid structured ideas after retrying.")
 
@@ -396,28 +406,33 @@ async def generate_ideas(
     extra_notes: str = "",
 ) -> GenerationResult:
     started = time.perf_counter()
+    step_timings = {"prompt_ms": 0.0, "provider_ms": 0.0, "validation_ms": 0.0}
     provider = get_provider(provider_name, api_key)
     if model:
         provider.model = model
     formats = list(FORMATS[:num_ideas])
     sources = retrieve_sources(f"{niche} {audience}")
-    ideas = await _generate_batch(
-        provider,
-        _prompt(
+    prompt_started = time.perf_counter()
+    prompt = _prompt(
             niche, audience, tone, formats, sources,
             target_keyword=target_keyword,
             est_word_count=est_word_count,
             extra_notes=extra_notes,
-        ),
-        formats,
     )
+    step_timings["prompt_ms"] += (time.perf_counter() - prompt_started) * 1000
+    provider_started = time.perf_counter()
+    ideas = await _generate_batch(provider, prompt, formats)
+    step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
 
     initial = list(ideas)
     results: list[dict] = []
     for index, idea in enumerate(ideas):
+        validation_started = time.perf_counter()
         errors = validate_idea(idea, niche, audience)
+        step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
         best, best_errors = idea, errors
         for _ in range(MAX_REFLECTION_ATTEMPTS if errors else 0):
+            prompt_started = time.perf_counter()
             candidate_prompt = _prompt(
                 niche, audience, tone, [formats[index]], sources,
                 feedback="; ".join(best_errors),
@@ -425,55 +440,93 @@ async def generate_ideas(
                 est_word_count=est_word_count,
                 extra_notes=extra_notes,
             )
+            step_timings["prompt_ms"] += (time.perf_counter() - prompt_started) * 1000
             try:
+                provider_started = time.perf_counter()
                 candidate = (await _generate_batch(provider, candidate_prompt, [formats[index]]))[0]
+                step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
             except ProviderError:
                 logger.warning("Targeted regeneration failed for idea %d", index + 1)
                 break
+            validation_started = time.perf_counter()
             candidate_errors = validate_idea(candidate, niche, audience)
+            step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
             if _idea_score(candidate_errors) > _idea_score(best_errors):
                 best, best_errors = candidate, candidate_errors
             if not candidate_errors:
                 break
         results.append(_result_dict(best, best_errors))
 
+    provider_started = time.perf_counter()
     embeddings = await provider.embed([_fingerprint(idea) for idea in initial])
+    step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
+    validation_started = time.perf_counter()
     duplicate_pairs = _duplicate_pairs(initial, embeddings)
+    step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
     for index, prior_index in duplicate_pairs:
         original_errors = results[index]["validation_errors"]
         best = BlogIdea.model_validate(results[index]["idea"])
         prior = BlogIdea.model_validate(results[prior_index]["idea"])
         best_errors = list(original_errors)
         for _ in range(MAX_REFLECTION_ATTEMPTS):
+            prompt_started = time.perf_counter()
             prompt = _prompt(
                 niche, audience, tone, [formats[index]], sources,
                 feedback=(
                     "This idea is too similar to another idea. Choose a clearly different "
                     "specific problem, hook, and angle. " + "; ".join(best_errors)
                 ),
+                target_keyword=target_keyword,
+                est_word_count=est_word_count,
+                extra_notes=extra_notes,
             )
+            step_timings["prompt_ms"] += (time.perf_counter() - prompt_started) * 1000
             try:
+                provider_started = time.perf_counter()
                 candidate = (await _generate_batch(provider, prompt, [formats[index]]))[0]
+                step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
             except ProviderError:
                 logger.warning("Duplicate regeneration failed for idea %d", index + 1)
                 break
+            validation_started = time.perf_counter()
             candidate_errors = validate_idea(candidate, niche, audience)
+            step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
+            provider_started = time.perf_counter()
             candidate_vectors = await provider.embed(
                 [_fingerprint(candidate), _fingerprint(prior)]
             )
+            step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
+            validation_started = time.perf_counter()
             similarity = _similarity(
                 candidate_vectors[0], candidate_vectors[1]
             ) if candidate_vectors else lexical_similarity(candidate, prior)
-            if similarity < DUPLICATE_THRESHOLD and len(candidate_errors) <= len(best_errors):
+            step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
+            if (
+                not _keywords_match(candidate.target_keyword, prior.target_keyword)
+                and similarity < DUPLICATE_THRESHOLD
+                and len(candidate_errors) <= len(best_errors)
+            ):
                 best, best_errors = candidate, candidate_errors
                 break
         if len(best_errors) <= len(original_errors):
             results[index] = _result_dict(best, best_errors)
 
+    provider_started = time.perf_counter()
+    final_embeddings = await provider.embed(
+        [_fingerprint(BlogIdea.model_validate(item["idea"])) for item in results]
+    )
+    step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
+    validation_started = time.perf_counter()
     final_duplicates = _duplicate_pairs(
         [BlogIdea.model_validate(item["idea"]) for item in results],
-        await provider.embed([_fingerprint(BlogIdea.model_validate(item["idea"])) for item in results]),
+        final_embeddings,
     )
+    step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
+    for index, prior_index in final_duplicates:
+        warning = f"Near-duplicate idea or repeated target keyword detected against idea {prior_index + 1}."
+        if warning not in results[index]["validation_errors"]:
+            results[index]["validation_errors"].append(warning)
+            results[index]["valid"] = False
     passed = sum(not item["validation_errors"] for item in results)
     elapsed = round((time.perf_counter() - started) * 1000, 2)
     return GenerationResult(
@@ -484,6 +537,7 @@ async def generate_ideas(
         latency_ms=elapsed,
         validation_pass_rate=passed / max(len(results), 1),
         duplicate_rate=len(final_duplicates) / max(len(results), 1),
+        step_timings={key: round(value, 2) for key, value in step_timings.items()},
     )
 
 
@@ -505,6 +559,9 @@ def _duplicate_pairs(
     duplicates = []
     for right in range(len(ideas)):
         for left in range(right):
+            if _keywords_match(ideas[left].target_keyword, ideas[right].target_keyword):
+                duplicates.append((right, left))
+                break
             similarity = (
                 _similarity(embeddings[left], embeddings[right])
                 if embeddings
@@ -514,6 +571,13 @@ def _duplicate_pairs(
                 duplicates.append((right, left))
                 break
     return duplicates
+
+
+def _keywords_match(left: str, right: str) -> bool:
+    def normalize(value: str) -> str:
+        return " ".join(re.findall(r"[a-z0-9]+", value.lower()))
+
+    return bool(normalize(left)) and normalize(left) == normalize(right)
 
 
 def _similarity(left: list[float], right: list[float]) -> float:
@@ -558,6 +622,7 @@ def demo_ideas_from_prompt(prompt: str) -> list[dict]:
         return []
     niche, audience, raw_formats = match.groups()
     formats = json.loads(raw_formats)
+    recorded_ideas = _recorded_demo_ideas(prompt)
     tone_match = re.search(r"Tone: (.*)", prompt)
     tone = tone_match.group(1).splitlines()[0] if tone_match else "Use precise, confident language and avoid slang."
     tone_hook = (
@@ -581,6 +646,9 @@ def demo_ideas_from_prompt(prompt: str) -> list[dict]:
     }
     results = []
     for selected_format in formats:
+        if selected_format == "listicle" and recorded_ideas:
+            results.append(recorded_ideas[0])
+            continue
         title, angle = patterns[selected_format]
         title = _fit_title(title)
         body = (
@@ -631,7 +699,14 @@ def demo_ideas_from_prompt(prompt: str) -> list[dict]:
             "title": title,
             "hook": f"{tone_hook} for {audience} exploring {niche}, grounded in practical examples rather than hype.",
             "angle": angle,
-            "target_keyword": f"{niche} for {audience}",
+            "target_keyword": {
+                "listicle": f"{niche} skills for {audience}",
+                "how-to": f"how to build a {niche} project for {audience}",
+                "comparison": f"{niche} tools compared for {audience}",
+                "case study": f"{niche} portfolio case study for {audience}",
+                "myth-busting": f"{niche} myths for {audience}",
+                "interview prep": f"{niche} interview preparation for {audience}",
+            }[selected_format],
             "search_intent": "informational",
             "audience": audience,
             "est_word_count": 1200,
@@ -639,6 +714,50 @@ def demo_ideas_from_prompt(prompt: str) -> list[dict]:
             "outline": outline,
         })
     return results
+
+
+def _recorded_demo_ideas(prompt: str) -> list[dict] | None:
+    match = re.search(
+        r'for the niche "(.*?)" and audience "(.*?)".*?Use each assigned format once, in this order: (\[.*?\])',
+        prompt,
+        re.S,
+    )
+    if not match:
+        return None
+    niche, audience, raw_formats = match.groups()
+    formats = json.loads(raw_formats)
+    tone_match = re.search(r"Tone: (.*)", prompt)
+    tone = tone_match.group(1).splitlines()[0] if tone_match else ""
+    if (
+        "listicle" not in formats
+        or "india" not in audience.lower()
+        or not any(word in audience.lower() for word in ("student", "fresher"))
+        or not ("precise" in tone or "plainly" in tone)
+        or "Additional writer notes: none." not in prompt
+        or "Target keyword: choose a natural, specific phrase" not in prompt
+        or "Estimated word count target: 1200." not in prompt
+    ):
+        return None
+    fixture_path = os.path.join(os.path.dirname(__file__), "fixtures", "llama31_samples.json")
+    try:
+        with open(fixture_path, encoding="utf-8") as source:
+            recordings = json.load(source)
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.warning("Recorded Demo fixtures could not be loaded: %s", type(exc).__name__)
+        return None
+    for recording in recordings:
+        if recording.get("niche", "").casefold() != niche.casefold():
+            continue
+        for result in recording.get("ideas", []):
+            idea = result.get("idea", {})
+            if (
+                idea.get("format") == "listicle"
+                and idea.get("audience") == recording.get("audience")
+            ):
+                return [idea]
+    return None
 
 
 async def regenerate_one(
@@ -651,21 +770,34 @@ async def regenerate_one(
     api_key: str | None = None,
 ) -> GenerationResult:
     started = time.perf_counter()
+    step_timings = {"prompt_ms": 0.0, "provider_ms": 0.0, "validation_ms": 0.0}
     provider = get_provider(provider_name, api_key)
     sources = retrieve_sources(f"{niche} {audience}")
+    prompt_started = time.perf_counter()
     prompt = _prompt(niche, audience, tone, [selected_format], sources, feedback)
+    step_timings["prompt_ms"] += (time.perf_counter() - prompt_started) * 1000
+    provider_started = time.perf_counter()
     idea = (await _generate_batch(provider, prompt, [selected_format]))[0]
+    step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
+    validation_started = time.perf_counter()
     errors = validate_idea(idea, niche, audience)
+    step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
     for _ in range(MAX_REFLECTION_ATTEMPTS if errors else 0):
+        prompt_started = time.perf_counter()
         candidate_prompt = _prompt(
             niche, audience, tone, [selected_format], sources,
             feedback="; ".join(errors),
         )
+        step_timings["prompt_ms"] += (time.perf_counter() - prompt_started) * 1000
         try:
+            provider_started = time.perf_counter()
             candidate = (await _generate_batch(provider, candidate_prompt, [selected_format]))[0]
+            step_timings["provider_ms"] += (time.perf_counter() - provider_started) * 1000
         except ProviderError:
             break
+        validation_started = time.perf_counter()
         candidate_errors = validate_idea(candidate, niche, audience)
+        step_timings["validation_ms"] += (time.perf_counter() - validation_started) * 1000
         if len(candidate_errors) < len(errors):
             idea, errors = candidate, candidate_errors
         if not errors:
@@ -678,4 +810,5 @@ async def regenerate_one(
         latency_ms=round((time.perf_counter() - started) * 1000, 2),
         validation_pass_rate=float(not errors),
         duplicate_rate=0.0,
+        step_timings={key: round(value, 2) for key, value in step_timings.items()},
     )

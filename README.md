@@ -4,7 +4,7 @@ Turn a niche and audience into distinct, structured, quality-checked blog briefs
 
 ## Demo and screenshots
 
-The app runs locally in **Demo mode** without API keys; model-generated results require a configured provider. A recorded 30–60 second GIF and real screenshots have not been captured yet. Add them under `docs/assets/` after recording the full local flow; do not present the deterministic Demo output as live LLM output.
+The app is live at **[blog-idea-generator-0qap.onrender.com](https://blog-idea-generator-0qap.onrender.com/)** and currently runs in **Demo mode** without API keys; model-generated results require a configured provider. A recorded 30–60 second GIF and real screenshots have not been captured yet. Add them under `docs/assets/` after recording the full local flow; do not present the deterministic Demo output as live LLM output.
 
 ## Run locally
 

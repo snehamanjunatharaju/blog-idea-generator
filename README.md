@@ -4,7 +4,21 @@ Turn a niche and audience into distinct, structured, quality-checked blog briefs
 
 ## Demo and screenshots
 
-The app is live at **[blog-idea-generator-0qap.onrender.com](https://blog-idea-generator-0qap.onrender.com/)** and currently runs in **Demo mode** without API keys; model-generated results require a configured provider. A recorded 30–60 second GIF and real screenshots have not been captured yet. Add them under `docs/assets/` after recording the full local flow; do not present the deterministic Demo output as live LLM output.
+The app is live at **[blog-idea-generator-0qap.onrender.com](https://blog-idea-generator-0qap.onrender.com/)** and currently runs in **Demo mode** without API keys. Demo mode uses pre-recorded local `llama3.1:8b` samples for supported niches, with the source shown in the result mode, plus built-in examples for other formats and niches. Screenshots below are from the local Demo app; a 30–60 second screen-recorded GIF remains to be captured.
+
+![Blog Idea Generator header](docs/assets/header.png)
+
+![Brief form and starter niches](docs/assets/form.png)
+
+![Generated briefs with validation and per-idea actions](docs/assets/results.png)
+
+## Evaluation snapshot
+
+| Provider | Niches | Ideas | Validation pass rate | Near-duplicate rate | Avg latency | Cost |
+|---|---:|---:|---:|---:|---:|---:|
+| Offline Demo | 15 | 45 | 100% | 0% | 0.38 ms | $0.00 |
+
+This is a deterministic pipeline smoke evaluation, not an LLM quality benchmark. See the [per-niche results](docs/evaluation.md) and [architecture notes](docs/architecture.md).
 
 ## Run locally
 
@@ -73,17 +87,20 @@ For Render, use the included Blueprint at [render.yaml](./render.yaml), or use b
 
 ## Known limitations
 
-- The built-in Demo provider is deterministic sample data and does not call an LLM.
-- The small grounding set contains editorial guidance, not niche-specific research or live keyword-volume data. Sources are displayed in the UI so they are not misrepresented as external factual citations.
+- Demo replays saved samples and deterministic built-in examples; it does not call a live LLM.
+- Demo includes eight saved model outputs, labelled as recorded from `llama3.1:8b`; they are not live generations. A recording helper is available at `python -m scripts.record_demo` for a local Ollama installation.
+- Only four of the eight raw Llama recordings currently pass every validator; the other four remain visibly flagged in Demo rather than being silently rewritten. These recordings are examples, not evidence that the provider meets the 100% Demo smoke-test pass rate.
+- The bundled niche notes cover Power BI, SQL, data analytics, personal finance, fitness, and interior design. They are editorial guidance, not external research or live keyword-volume data; unsupported niches receive a labelled generic fallback.
 - Embeddings depend on Ollama's embedding endpoint and an installed embedding model; lexical cosine fallback can miss paraphrases.
 - Validation is rule-based and cannot prove factual accuracy, guarantee SEO performance, or ensure every generated idea is useful. Review model-generated claims before publishing.
 - There is no semantic response cache or daily per-user request cap. The shared Demo quota is global to the SQLite database. Per-IP rate limiting is in-process and resets on restart; use a shared limiter for multi-instance deployment.
-- Provider token usage/cost, authentication, durable hosted analytics, screenshots, and the demo GIF are not currently included.
+- Provider token usage/cost, authentication, durable hosted analytics, and the demo GIF are not currently included. Screenshots show the local Demo app, not the live deployment.
 
 ## Project files
 
 - `main.py` — FastAPI routes, per-IP rate limit, metrics, and shared Demo quota.
 - `idea_engine.py` — providers, structured generation, validation, reflection, and duplicate checks.
 - `knowledge_base.py` — small retrievable editorial knowledge base.
+- `knowledge/` — niche-specific writing constraints plus the labelled generic fallback.
 - `run_history.py` — SQLite persistence and aggregate metrics.
 - `tests/` — validator, provider, API, history, and UX coverage.

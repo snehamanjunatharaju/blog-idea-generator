@@ -4,22 +4,22 @@ Generated on the selected `demo` provider across 15 sample niches (45 ideas, 3 p
 
 | Niche | Validation pass rate | Near-duplicate rate | Latency (ms) | Cost |
 |---|---:|---:|---:|---:|
-| Power BI | 100% | 0% | 0.64 | $0.00 |
-| Python for data analysis | 100% | 0% | 0.32 | $0.00 |
-| personal finance | 100% | 0% | 0.29 | $0.00 |
-| home fitness | 100% | 0% | 0.27 | $0.00 |
-| sustainable fashion | 100% | 0% | 0.28 | $0.00 |
-| beginner photography | 100% | 0% | 0.27 | $0.00 |
-| small business marketing | 100% | 0% | 0.27 | $0.00 |
-| cloud computing | 100% | 0% | 0.27 | $0.00 |
-| healthy meal planning | 100% | 0% | 0.27 | $0.00 |
-| career transitions | 100% | 0% | 0.26 | $0.00 |
-| interior design | 100% | 0% | 0.26 | $0.00 |
-| cybersecurity basics | 100% | 0% | 0.26 | $0.00 |
-| product management | 100% | 0% | 0.27 | $0.00 |
-| urban gardening | 100% | 0% | 0.27 | $0.00 |
-| technical interview preparation | 100% | 0% | 0.27 | $0.00 |
-| **Average** | **100%** | **0%** | **0.30** | **$0.00 (Demo mode)** |
+| Power BI | 100% | 0% | 0.86 | $0.00 |
+| Python for data analysis | 100% | 0% | 0.42 | $0.00 |
+| personal finance | 100% | 0% | 0.35 | $0.00 |
+| home fitness | 100% | 0% | 0.37 | $0.00 |
+| sustainable fashion | 100% | 0% | 0.42 | $0.00 |
+| beginner photography | 100% | 0% | 0.34 | $0.00 |
+| small business marketing | 100% | 0% | 0.32 | $0.00 |
+| cloud computing | 100% | 0% | 0.30 | $0.00 |
+| healthy meal planning | 100% | 0% | 0.38 | $0.00 |
+| career transitions | 100% | 0% | 0.37 | $0.00 |
+| interior design | 100% | 0% | 0.40 | $0.00 |
+| cybersecurity basics | 100% | 0% | 0.31 | $0.00 |
+| product management | 100% | 0% | 0.29 | $0.00 |
+| urban gardening | 100% | 0% | 0.29 | $0.00 |
+| technical interview preparation | 100% | 0% | 0.31 | $0.00 |
+| **Average** | **100%** | **0%** | **0.38** | **$0.00 (Demo mode)** |
 
 ## Method and limitations
 

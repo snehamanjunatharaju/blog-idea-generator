@@ -68,7 +68,7 @@ docker build -t blog-idea-generator .
 docker run --rm -p 8001:8001 blog-idea-generator
 ```
 
-For Render, use build command `pip install -r requirements.txt` and start command `uvicorn main:app --host 0.0.0.0 --port $PORT`. Configure provider credentials as Render environment variables and set `LLM_PROVIDER=demo` for an always-available demo. Ollama is not included in the web service. SQLite on an ephemeral filesystem is not durable across redeploys; use a persistent disk and set `DATABASE_PATH` if run history must persist.
+For Render, use the included Blueprint at [render.yaml](./render.yaml), or use build command `pip install -r requirements.txt` and start command `uvicorn main:app --host 0.0.0.0 --port $PORT`. The Blueprint uses Demo mode so it runs without API keys. Ollama is not included in the web service. SQLite on an ephemeral filesystem is not durable across redeploys; use a persistent disk and set `DATABASE_PATH` if run history must persist.
 
 ## Known limitations
 
@@ -77,7 +77,7 @@ For Render, use build command `pip install -r requirements.txt` and start comman
 - Embeddings depend on Ollama's embedding endpoint and an installed embedding model; lexical cosine fallback can miss paraphrases.
 - Validation is rule-based and cannot prove factual accuracy, guarantee SEO performance, or ensure every generated idea is useful. Review model-generated claims before publishing.
 - There is no semantic response cache or daily per-user request cap. Per-IP rate limiting is in-process and resets on restart; use a shared limiter for multi-instance deployment.
-- Provider token usage/cost, authentication, durable hosted analytics, a live deployment URL, screenshots, and the demo GIF are not currently included.
+- Provider token usage/cost, authentication, durable hosted analytics, screenshots, and the demo GIF are not currently included.
 
 ## Project files
 

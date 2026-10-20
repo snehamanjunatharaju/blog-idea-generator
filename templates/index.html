@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Create practical, structured blog briefs with quality checks.">
+    <title>Blog Idea Generator</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+    <main class="container">
+        <header class="site-header">
+            <div>
+                <p class="eyebrow">A practical editorial copilot</p>
+                <h1>Blog Idea Generator</h1>
+                <p>Turn a niche into distinct, grounded briefs a writer can act on.</p>
+            </div>
+            <span id="modeBadge" class="mode-badge">{{ mode.mode }}{% if mode.model %} · {{ mode.model }}{% endif %}</span>
+        </header>
+
+        <section class="form-container" aria-labelledby="briefHeading">
+            <h2 id="briefHeading">Shape your brief</h2>
+            <form id="ideaForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="niche">Niche</label>
+                        <input type="text" id="niche" name="niche" required maxlength="120"
+                               placeholder="e.g. Power BI" value="Power BI">
+                    </div>
+                    <div class="form-group">
+                        <label for="audience">Target audience</label>
+                        <input type="text" id="audience" name="audience" required maxlength="120"
+                               value="freshers in India">
+                    </div>
+                    <div class="form-group">
+                        <label for="num_ideas">Number of ideas</label>
+                        <select id="num_ideas" name="num_ideas">
+                            <option value="1">1</option>
+                            <option value="3" selected>3</option>
+                            <option value="5">5</option>
+                            <option value="6">6</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tone">Writing tone</label>
+                        <select id="tone" name="tone">
+                            <option value="professional" selected>Professional</option>
+                            <option value="conversational">Conversational</option>
+                            <option value="humorous">Humorous</option>
+                            <option value="inspirational">Inspirational</option>
+                            <option value="educational">Educational</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" id="generateBtn">Generate briefs</button>
+            </form>
+        </section>
+
+        <section id="resultsContainer" class="results-container" hidden aria-live="polite">
+            <div class="results-heading">
+                <div>
+                    <p class="eyebrow">Your results</p>
+                    <h2>Blog briefs</h2>
+                </div>
+                <div class="toolbar">
+                    <button type="button" class="button-secondary" id="copyAllBtn">Copy all</button>
+                    <button type="button" class="button-secondary" id="exportBtn">Export Markdown</button>
+                </div>
+            </div>
+            <div id="loading" class="loading" hidden>
+                <span class="spinner" aria-hidden="true"></span>
+                <div>
+                    <strong id="progressTitle">Preparing your brief</strong>
+                    <p id="progressText">Checking the niche and audience…</p>
+                </div>
+            </div>
+            <p id="errorMessage" class="error" role="alert" hidden></p>
+            <div id="runSummary" class="run-summary"></div>
+            <div id="results" class="idea-list"></div>
+            <section class="sources-panel" id="sourcesPanel" hidden>
+                <h3>Grounding notes</h3>
+                <p class="muted">These editorial references guide the format; they are not niche-specific research.</p>
+                <ul id="sources"></ul>
+            </section>
+        </section>
+
+        <section class="metrics-panel" aria-labelledby="metricsHeading">
+            <div class="results-heading">
+                <div>
+                    <p class="eyebrow">Measured locally</p>
+                    <h2 id="metricsHeading">Quality metrics</h2>
+                </div>
+                <button type="button" class="button-secondary" id="exportHistoryBtn">Export run history CSV</button>
+            </div>
+            <div id="metrics" class="metrics-grid">
+                <p class="muted">Metrics appear after the first generation.</p>
+            </div>
+            <div id="providerMetrics" class="provider-metrics"></div>
+        </section>
+    </main>
+
+    <script>
+        const form = document.getElementById('ideaForm');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const results = document.getElementById('results');
+        const loading = document.getElementById('loading');
+        const errorMessage = document.getElementById('errorMessage');
+        let lastResponse = null;
+        let progressTimer = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshMode();
+            refreshMetrics();
+        });
+
+        async function refreshMode() {
+            try {
+                const response = await fetch('/mode');
+                if (!response.ok) return;
+                const data = await response.json();
+                document.getElementById('modeBadge').textContent = `${data.mode} · ${data.model}`;
+            } catch (error) {
+                console.error('Could not load provider mode:', error);
+            }
+        }
+
+        async function refreshMetrics() {
+            try {
+                const response = await fetch('/metrics');
+                const data = await response.json();
+                const metrics = document.getElementById('metrics');
+                metrics.replaceChildren();
+                [
+                    ['Runs', data.runs],
+                    ['Ideas checked', data.ideas],
+                    ['Validation pass rate', `${(data.validation_pass_rate * 100).toFixed(0)}%`],
+                    ['Average latency', `${data.avg_latency_ms.toFixed(2)} ms`],
+                    ['Near-duplicate rate', `${(data.avg_duplicate_rate * 100).toFixed(0)}%`]
+                ].forEach(([label, value]) => {
+                    const item = document.createElement('div');
+                    item.className = 'metric';
+                    const number = document.createElement('strong');
+                    number.textContent = value;
+                    const caption = document.createElement('span');
+                    caption.textContent = label;
+                    item.append(number, caption);
+                    metrics.append(item);
+                });
+                if (Object.keys(data.failure_types).length) {
+                    const failures = document.createElement('p');
+                    failures.className = 'muted failure-types';
+                    failures.textContent = `Common validation issues: ${Object.entries(data.failure_types).map(([name, count]) => `${name} (${count})`).join(' · ')}`;
+                    metrics.append(failures);
+                }
+                const breakdown = document.getElementById('providerMetrics');
+                breakdown.replaceChildren();
+                if (data.by_model_and_tone.length) {
+                    const heading = document.createElement('h3');
+                    heading.textContent = 'By model and tone';
+                    const table = document.createElement('table');
+                    const head = document.createElement('thead');
+                    const headerRow = document.createElement('tr');
+                    ['Mode / model', 'Tone', 'Runs', 'Pass rate', 'Avg latency', 'Duplicate rate'].forEach((label) => {
+                        const cell = document.createElement('th');
+                        cell.scope = 'col';
+                        cell.textContent = label;
+                        headerRow.append(cell);
+                    });
+                    head.append(headerRow);
+                    const body = document.createElement('tbody');
+                    data.by_model_and_tone.forEach((row) => {
+                        const tableRow = document.createElement('tr');
+                        [
+                            `${row.mode} / ${row.model}`,
+                            row.tone,
+                            row.runs,
+                            `${(row.validation_pass_rate * 100).toFixed(0)}%`,
+                            `${row.avg_latency_ms.toFixed(2)} ms`,
+                            `${(row.avg_duplicate_rate * 100).toFixed(0)}%`
+                        ].forEach((value) => {
+                            const cell = document.createElement('td');
+                            cell.textContent = value;
+                            tableRow.append(cell);
+                        });
+                        body.append(tableRow);
+                    });
+                    table.append(head, body);
+                    breakdown.append(heading, table);
+                }
+            } catch (error) {
+                console.error('Could not load metrics:', error);
+            }
+        }
+
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            resultsContainer.hidden = false;
+            errorMessage.hidden = true;
+            results.replaceChildren();
+            document.getElementById('runSummary').replaceChildren();
+            startProgress();
+            try {
+                const response = await fetch('/generate', { method: 'POST', body: new FormData(form) });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+                lastResponse = data;
+                renderResults(data);
+                refreshMetrics();
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
+            } finally {
+                stopProgress();
+            }
+        });
+
+        function startProgress() {
+            loading.hidden = false;
+            const steps = [
+                ['Checking your brief', 'Retrieving relevant editorial guidance…'],
+                ['Drafting distinct angles', 'Building structured ideas in the selected tone…'],
+                ['Running quality checks', 'Checking titles, audience fit, outlines, and duplicates…']
+            ];
+            let index = 0;
+            progressTimer = setInterval(() => {
+                index = Math.min(index + 1, steps.length - 1);
+                document.getElementById('progressTitle').textContent = steps[index][0];
+                document.getElementById('progressText').textContent = steps[index][1];
+            }, 1800);
+        }
+
+        function stopProgress() {
+            clearInterval(progressTimer);
+            loading.hidden = true;
+        }
+
+        function renderResults(data) {
+            lastResponse = data;
+            results.replaceChildren();
+            data.ideas.forEach((result, index) => results.append(renderIdea(result, index)));
+            const summary = document.getElementById('runSummary');
+            summary.textContent = `${data.mode} · ${data.model} · ${data.latency_ms.toFixed(2)} ms · ${(data.validation_pass_rate * 100).toFixed(0)}% passed checks · ${(data.duplicate_rate * 100).toFixed(0)}% near-duplicate rate`;
+            const sourceList = document.getElementById('sources');
+            sourceList.replaceChildren();
+            data.sources.forEach((source) => {
+                const item = document.createElement('li');
+                const title = document.createElement('strong');
+                title.textContent = source.title;
+                const detail = document.createElement('span');
+                detail.textContent = ` — ${source.content}`;
+                item.append(title, detail);
+                sourceList.append(item);
+            });
+            document.getElementById('sourcesPanel').hidden = !data.sources.length;
+        }
+
+        function renderIdea(result, index) {
+            const idea = result.idea;
+            const card = document.createElement('article');
+            card.className = 'idea-card';
+            const header = document.createElement('div');
+            header.className = 'idea-card-header';
+            const titleArea = document.createElement('div');
+            const format = document.createElement('span');
+            format.className = 'format-tag';
+            format.textContent = idea.format;
+            const title = document.createElement('h3');
+            title.textContent = idea.title;
+            const badge = document.createElement('span');
+            badge.className = result.valid ? 'validation-badge valid' : 'validation-badge warning';
+            badge.textContent = result.valid ? 'Checks passed' : `${result.validation_errors.length} check${result.validation_errors.length === 1 ? '' : 's'} to review`;
+            titleArea.append(format, title, badge);
+            header.append(titleArea);
+
+            const details = document.createElement('dl');
+            details.className = 'idea-details';
+            [
+                ['Hook', idea.hook],
+                ['Angle', idea.angle],
+                ['Target keyword', idea.target_keyword],
+                ['Search intent', idea.search_intent],
+                ['Audience', idea.audience],
+                ['Estimated length', `${idea.est_word_count.toLocaleString()} words`]
+            ].forEach(([label, value]) => {
+                const row = document.createElement('div');
+                const term = document.createElement('dt');
+                term.textContent = label;
+                const description = document.createElement('dd');
+                description.textContent = value;
+                row.append(term, description);
+                details.append(row);
+            });
+
+            const outlineHeading = document.createElement('h4');
+            outlineHeading.textContent = 'Outline';
+            const outline = document.createElement('ol');
+            outline.className = 'outline';
+            idea.outline.forEach((section) => {
+                const item = document.createElement('li');
+                const heading = document.createElement('strong');
+                heading.textContent = section.heading;
+                const summary = document.createElement('p');
+                summary.textContent = section.summary;
+                item.append(heading, summary);
+                outline.append(item);
+            });
+            card.append(header, details, outlineHeading, outline);
+
+            if (result.validation_errors.length) {
+                const warnings = document.createElement('ul');
+                warnings.className = 'validation-errors';
+                result.validation_errors.forEach((message) => {
+                    const item = document.createElement('li');
+                    item.textContent = message;
+                    warnings.append(item);
+                });
+                card.append(warnings);
+            }
+
+            const actions = document.createElement('div');
+            actions.className = 'idea-actions';
+            const copy = document.createElement('button');
+            copy.type = 'button';
+            copy.className = 'button-secondary';
+            copy.textContent = 'Copy this idea';
+            copy.addEventListener('click', () => copyText(toMarkdown(result), copy));
+            const regenerate = document.createElement('button');
+            regenerate.type = 'button';
+            regenerate.className = 'button-secondary';
+            regenerate.textContent = 'Regenerate this idea';
+            regenerate.addEventListener('click', () => regenerateIdea(index, result, regenerate));
+            actions.append(copy, regenerate);
+            card.append(actions);
+            return card;
+        }
+
+        async function regenerateIdea(index, result, button) {
+            button.disabled = true;
+            button.textContent = 'Regenerating…';
+            const payload = new FormData(form);
+            payload.set('format', result.idea.format);
+            payload.set('feedback', result.validation_errors.join('; ') || 'Make the hook and angle more specific and distinct.');
+            try {
+                const response = await fetch('/regenerate', { method: 'POST', body: payload });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+                lastResponse.ideas[index] = data.ideas[0];
+                results.replaceChildren(...lastResponse.ideas.map(renderIdea));
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Regenerate this idea';
+            }
+        }
+
+        function toMarkdown(result) {
+            const idea = result.idea;
+            return `## ${idea.title}\n\n**Format:** ${idea.format}  \n**Hook:** ${idea.hook}  \n**Angle:** ${idea.angle}  \n**Target keyword:** ${idea.target_keyword}  \n**Search intent:** ${idea.search_intent}  \n**Audience:** ${idea.audience}  \n**Estimated length:** ${idea.est_word_count} words\n\n### Outline\n${idea.outline.map((section) => `- **${section.heading}:** ${section.summary}`).join('\n')}${result.validation_errors.length ? `\n\n**Checks to review:** ${result.validation_errors.join('; ')}` : ''}`;
+        }
+
+        async function copyText(text, button) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const oldText = button.textContent;
+                button.textContent = 'Copied!';
+                setTimeout(() => { button.textContent = oldText; }, 1500);
+            } catch (error) {
+                console.error('Clipboard copy failed:', error);
+            }
+        }
+
+        document.getElementById('copyAllBtn').addEventListener('click', () => {
+            if (lastResponse) copyText(lastResponse.ideas.map(toMarkdown).join('\n\n---\n\n'), document.getElementById('copyAllBtn'));
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            if (!lastResponse) return;
+            const markdown = `# Blog idea briefs\n\n${lastResponse.ideas.map(toMarkdown).join('\n\n---\n\n')}\n\n## Grounding notes\n${lastResponse.sources.map((source) => `- **${source.title}:** ${source.content}`).join('\n')}`;
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([markdown], { type: 'text/markdown' }));
+            link.download = 'blog-idea-briefs.md';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        });
+
+        document.getElementById('exportHistoryBtn').addEventListener('click', async () => {
+            const token = window.prompt('Enter the HISTORY_EXPORT_TOKEN configured for this app:');
+            if (!token) return;
+            try {
+                const response = await fetch('/history.csv', { headers: { 'X-History-Token': token } });
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.detail || `Request failed (${response.status})`);
+                }
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(await response.blob());
+                link.download = 'generation-history.csv';
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
+            }
+        });
+    </script>
+</body>
+</html>

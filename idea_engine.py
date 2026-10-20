@@ -92,8 +92,9 @@ class ProviderError(RuntimeError):
 
 
 class Provider:
-    def __init__(self, mode: str):
+    def __init__(self, mode: str, api_key: str | None = None):
         self.mode = mode
+        self.api_key = api_key
         self.model = os.getenv("LLM_MODEL", "")
         self.base_url = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").rstrip("/")
 
@@ -110,7 +111,9 @@ class Provider:
                 response.raise_for_status()
                 return response.json()["response"]
         if self.mode == "openai":
-            key = os.environ["OPENAI_API_KEY"]
+            key = self.api_key or os.getenv("OPENAI_API_KEY")
+            if not key:
+                raise ProviderError("Add an OpenAI key or choose Demo mode.")
             model = self.model or "gpt-4o-mini"
             async with httpx.AsyncClient(timeout=90) as client:
                 response = await client.post(
@@ -125,7 +128,9 @@ class Provider:
                 response.raise_for_status()
                 return response.json()["choices"][0]["message"]["content"]
         if self.mode == "anthropic":
-            key = os.environ["ANTHROPIC_API_KEY"]
+            key = self.api_key or os.getenv("ANTHROPIC_API_KEY")
+            if not key:
+                raise ProviderError("Add an Anthropic key or choose Demo mode.")
             model = self.model or "claude-3-5-haiku-latest"
             async with httpx.AsyncClient(timeout=90) as client:
                 response = await client.post(
@@ -163,16 +168,16 @@ class Provider:
         return None
 
 
-def get_provider() -> Provider:
-    requested = os.getenv("LLM_PROVIDER", "auto").lower()
+def get_provider(requested: str | None = None, api_key: str | None = None) -> Provider:
+    requested = (requested or os.getenv("LLM_PROVIDER", "demo")).lower()
     if requested == "demo":
         return Provider("demo")
     if requested in {"ollama", "openai", "anthropic"}:
-        if requested == "openai" and not os.getenv("OPENAI_API_KEY"):
+        if requested == "openai" and not (api_key or os.getenv("OPENAI_API_KEY")):
             raise ProviderError("OPENAI_API_KEY is required for the OpenAI provider.")
-        if requested == "anthropic" and not os.getenv("ANTHROPIC_API_KEY"):
+        if requested == "anthropic" and not (api_key or os.getenv("ANTHROPIC_API_KEY")):
             raise ProviderError("ANTHROPIC_API_KEY is required for the Anthropic provider.")
-        provider = Provider(requested)
+        provider = Provider(requested, api_key)
         if requested == "ollama" and not provider.model:
             provider.model = _default_ollama_model() or "llama3.2"
         if requested == "ollama":
@@ -184,6 +189,8 @@ def get_provider() -> Provider:
         return provider
     if requested != "auto":
         raise ProviderError("LLM_PROVIDER must be auto, demo, ollama, openai, or anthropic.")
+    if api_key:
+        raise ProviderError("Choose Anthropic or OpenAI when using a bring-your-own key.")
     if os.getenv("ANTHROPIC_API_KEY"):
         return Provider("anthropic")
     if os.getenv("OPENAI_API_KEY"):
@@ -244,6 +251,9 @@ def _prompt(
     formats: list[str],
     sources: list[dict],
     feedback: str = "",
+    target_keyword: str = "",
+    est_word_count: int | None = None,
+    extra_notes: str = "",
 ) -> str:
     source_text = "\n".join(f"- {source['title']}: {source['content']}" for source in sources)
     tone_text = {
@@ -257,6 +267,9 @@ def _prompt(
 Create exactly {len(formats)} distinct blog ideas for the niche "{niche}" and audience "{audience}".
 Use each assigned format once, in this order: {json.dumps(formats)}.
 Tone: {tone_text}
+Target keyword: {target_keyword or "choose a natural, specific phrase"}
+Estimated word count target: {est_word_count or "choose based on the topic"}.
+Additional writer notes: {extra_notes or "none"}.
 
 Each idea must be one JSON object with title, hook, angle, target_keyword, search_intent
 (informational, commercial, transactional, or navigational), audience, est_word_count,
@@ -376,14 +389,28 @@ async def generate_ideas(
     num_ideas: int,
     tone: str,
     model: str | None = None,
+    provider_name: str | None = None,
+    api_key: str | None = None,
+    target_keyword: str = "",
+    est_word_count: int | None = None,
+    extra_notes: str = "",
 ) -> GenerationResult:
     started = time.perf_counter()
-    provider = get_provider()
+    provider = get_provider(provider_name, api_key)
     if model:
         provider.model = model
     formats = list(FORMATS[:num_ideas])
     sources = retrieve_sources(f"{niche} {audience}")
-    ideas = await _generate_batch(provider, _prompt(niche, audience, tone, formats, sources), formats)
+    ideas = await _generate_batch(
+        provider,
+        _prompt(
+            niche, audience, tone, formats, sources,
+            target_keyword=target_keyword,
+            est_word_count=est_word_count,
+            extra_notes=extra_notes,
+        ),
+        formats,
+    )
 
     initial = list(ideas)
     results: list[dict] = []
@@ -394,6 +421,9 @@ async def generate_ideas(
             candidate_prompt = _prompt(
                 niche, audience, tone, [formats[index]], sources,
                 feedback="; ".join(best_errors),
+                target_keyword=target_keyword,
+                est_word_count=est_word_count,
+                extra_notes=extra_notes,
             )
             try:
                 candidate = (await _generate_batch(provider, candidate_prompt, [formats[index]]))[0]
@@ -612,10 +642,16 @@ def demo_ideas_from_prompt(prompt: str) -> list[dict]:
 
 
 async def regenerate_one(
-    niche: str, audience: str, tone: str, selected_format: str, feedback: str
+    niche: str,
+    audience: str,
+    tone: str,
+    selected_format: str,
+    feedback: str,
+    provider_name: str | None = None,
+    api_key: str | None = None,
 ) -> GenerationResult:
     started = time.perf_counter()
-    provider = get_provider()
+    provider = get_provider(provider_name, api_key)
     sources = retrieve_sources(f"{niche} {audience}")
     prompt = _prompt(niche, audience, tone, [selected_format], sources, feedback)
     idea = (await _generate_batch(provider, prompt, [selected_format]))[0]

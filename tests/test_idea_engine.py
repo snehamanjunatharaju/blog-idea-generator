@@ -164,6 +164,19 @@ def test_auto_mode_uses_demo_when_no_provider_is_available(monkeypatch):
     assert get_provider().mode == "demo"
 
 
+def test_default_provider_is_demo_without_configured_credentials(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    assert get_provider().mode == "demo"
+
+
+def test_bring_your_own_provider_key_is_held_only_by_provider_instance():
+    provider = get_provider("openai", "test-key-never-persist")
+    assert provider.mode == "openai"
+    assert provider.api_key == "test-key-never-persist"
+
+
 def test_each_format_has_a_distinct_demo_outline():
     ideas = demo_ideas_from_prompt(_prompt(NICHE, AUDIENCE, "professional", list(FORMATS), []))
     assert len({idea["format"] for idea in ideas}) == len(FORMATS)

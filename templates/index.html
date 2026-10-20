@@ -16,12 +16,37 @@
                 <p>Turn a niche into distinct, grounded briefs a writer can act on.</p>
             </div>
             <span id="modeBadge" class="mode-badge">{{ mode.mode }}{% if mode.model %} · {{ mode.model }}{% endif %}</span>
+            <span id="remainingRuns" class="mode-badge" aria-live="polite">Loading free runs…</span>
         </header>
 
         <section class="form-container" aria-labelledby="briefHeading">
             <h2 id="briefHeading">Shape your brief</h2>
             <form id="ideaForm">
                 <div class="form-grid">
+                    <div class="form-group">
+                        <label for="provider">Generation mode</label>
+                        <select id="provider" name="provider">
+                            <option value="demo">Demo</option>
+                            <option value="ollama">Local Ollama</option>
+                            <option value="anthropic">Anthropic</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="providerKey">Your provider key (optional)</label>
+                        <input type="password" id="providerKey" autocomplete="off" maxlength="300"
+                               placeholder="Used for this page session only">
+                        <small>Sent only with your request over HTTPS; never saved in browser storage or on this server.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="audiencePreset">Audience preset</label>
+                        <select id="audiencePreset">
+                            <option value="Blogger">Blogger</option>
+                            <option value="Student" selected>Student</option>
+                            <option value="Small business">Small business</option>
+                            <option value="YouTuber">YouTuber</option>
+                        </select>
+                    </div>
                     <div class="form-group">
                         <label for="niche">Niche</label>
                         <input type="text" id="niche" name="niche" required maxlength="120"
@@ -51,7 +76,28 @@
                             <option value="educational">Educational</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label for="target_keyword">Target keyword</label>
+                        <input type="text" id="target_keyword" name="target_keyword" maxlength="100" placeholder="Optional">
+                    </div>
+                    <div class="form-group">
+                        <label for="est_word_count">Target word count</label>
+                        <input type="number" id="est_word_count" name="est_word_count" min="300" max="5000" value="1200">
+                    </div>
+                    <div class="form-group">
+                        <label for="extra_notes">Extra notes</label>
+                        <textarea id="extra_notes" name="extra_notes" maxlength="1000" rows="3"></textarea>
+                    </div>
                 </div>
+                <div class="starter-chips" aria-label="Niche examples">
+                    <button type="button" data-niche="Power BI">Power BI</button>
+                    <button type="button" data-niche="SQL">SQL</button>
+                    <button type="button" data-niche="Data analytics">Data analytics</button>
+                    <button type="button" data-niche="Personal finance">Personal finance</button>
+                    <button type="button" data-niche="Fitness">Fitness</button>
+                    <button type="button" data-niche="Interior design">Interior design</button>
+                </div>
+                <p class="muted">Bring-your-own-key requests are not charged against the shared Demo quota. Use only a provider you trust.</p>
                 <button type="submit" id="generateBtn">Generate briefs</button>
             </form>
         </section>
@@ -65,6 +111,7 @@
                 <div class="toolbar">
                     <button type="button" class="button-secondary" id="copyAllBtn">Copy all</button>
                     <button type="button" class="button-secondary" id="exportBtn">Export Markdown</button>
+                    <button type="button" class="button-secondary" id="printBtn">Print</button>
                 </div>
             </div>
             <div id="loading" class="loading" hidden>
@@ -90,7 +137,8 @@
                     <p class="eyebrow">Measured locally</p>
                     <h2 id="metricsHeading">Quality metrics</h2>
                 </div>
-                <button type="button" class="button-secondary" id="exportHistoryBtn">Export run history CSV</button>
+                <button type="button" class="button-secondary" id="exportCsvBtn">Export ideas as CSV</button>
+                <button type="button" class="button-secondary" id="clearHistoryBtn">Clear browser history</button>
             </div>
             <div id="metrics" class="metrics-grid">
                 <p class="muted">Metrics appear after the first generation.</p>
@@ -107,10 +155,29 @@
         const errorMessage = document.getElementById('errorMessage');
         let lastResponse = null;
         let progressTimer = null;
+        let providerKey = '';
 
         document.addEventListener('DOMContentLoaded', () => {
             refreshMode();
             refreshMetrics();
+            document.getElementById('providerKey').addEventListener('input', (event) => {
+                providerKey = event.target.value;
+            });
+            document.getElementById('audiencePreset').addEventListener('change', (event) => {
+                const audience = {
+                    Blogger: 'bloggers in India',
+                    Student: 'students and freshers in India',
+                    'Small business': 'small business owners in India',
+                    YouTuber: 'YouTubers in India'
+                };
+                form.elements.audience.value = audience[event.target.value];
+            });
+            document.querySelectorAll('[data-niche]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    form.elements.niche.value = button.dataset.niche;
+                    form.requestSubmit();
+                });
+            });
         });
 
         async function refreshMode() {
@@ -119,6 +186,8 @@
                 if (!response.ok) return;
                 const data = await response.json();
                 document.getElementById('modeBadge').textContent = `${data.mode} · ${data.model}`;
+                document.getElementById('remainingRuns').textContent =
+                    `${data.remaining_daily_runs} Demo runs left today`;
             } catch (error) {
                 console.error('Could not load provider mode:', error);
             }
@@ -146,7 +215,7 @@
                     item.append(number, caption);
                     metrics.append(item);
                 });
-                if (Object.keys(data.failure_types).length) {
+                if (data.failure_types && Object.keys(data.failure_types).length) {
                     const failures = document.createElement('p');
                     failures.className = 'muted failure-types';
                     failures.textContent = `Common validation issues: ${Object.entries(data.failure_types).map(([name, count]) => `${name} (${count})`).join(' · ')}`;
@@ -200,12 +269,15 @@
             document.getElementById('runSummary').replaceChildren();
             startProgress();
             try {
-                const response = await fetch('/generate', { method: 'POST', body: new FormData(form) });
+                ensureSecureKeyTransport();
+                const response = await fetch('/generate', requestOptions(new FormData(form)));
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
                 lastResponse = data;
+                saveBrowserHistory(data);
                 renderResults(data);
                 refreshMetrics();
+                refreshMode();
             } catch (error) {
                 errorMessage.textContent = error.message;
                 errorMessage.hidden = false;
@@ -213,6 +285,31 @@
                 stopProgress();
             }
         });
+
+        function ensureSecureKeyTransport() {
+            const localHost = ['localhost', '127.0.0.1', '::1'].includes(location.hostname);
+            if (providerKey && location.protocol !== 'https:' && !localHost) {
+                throw new Error('Bring-your-own keys are sent only over HTTPS.');
+            }
+        }
+
+        function requestOptions(body) {
+            return {
+                method: 'POST',
+                body,
+                headers: providerKey ? { 'X-Provider-Key': providerKey } : {}
+            };
+        }
+
+        function saveBrowserHistory(data) {
+            try {
+                const history = JSON.parse(localStorage.getItem('blogIdeaHistory') || '[]');
+                history.unshift({ savedAt: new Date().toISOString(), ideas: data.ideas, sources: data.sources });
+                localStorage.setItem('blogIdeaHistory', JSON.stringify(history.slice(0, 10)));
+            } catch (error) {
+                console.warn('Browser history could not be saved.', error);
+            }
+        }
 
         function startProgress() {
             loading.hidden = false;
@@ -240,6 +337,7 @@
             data.ideas.forEach((result, index) => results.append(renderIdea(result, index)));
             const summary = document.getElementById('runSummary');
             summary.textContent = `${data.mode} · ${data.model} · ${data.latency_ms.toFixed(2)} ms · ${(data.validation_pass_rate * 100).toFixed(0)}% passed checks · ${(data.duplicate_rate * 100).toFixed(0)}% near-duplicate rate`;
+            document.getElementById('modeBadge').textContent = `${data.mode} · ${data.model}`;
             const sourceList = document.getElementById('sources');
             sourceList.replaceChildren();
             data.sources.forEach((source) => {
@@ -329,19 +427,37 @@
             regenerate.className = 'button-secondary';
             regenerate.textContent = 'Regenerate this idea';
             regenerate.addEventListener('click', () => regenerateIdea(index, result, regenerate));
-            actions.append(copy, regenerate);
+            const specific = document.createElement('button');
+            specific.type = 'button';
+            specific.className = 'button-secondary';
+            specific.textContent = 'Make more specific';
+            specific.addEventListener('click', () => regenerateIdea(index, result, specific, 'Add a concrete example, narrow the reader problem, and make the angle more specific.'));
+            const upvote = document.createElement('button');
+            upvote.type = 'button';
+            upvote.className = 'button-secondary';
+            upvote.textContent = '👍';
+            upvote.setAttribute('aria-label', 'Like this idea');
+            upvote.addEventListener('click', () => vote('up', upvote));
+            const downvote = document.createElement('button');
+            downvote.type = 'button';
+            downvote.className = 'button-secondary';
+            downvote.textContent = '👎';
+            downvote.setAttribute('aria-label', 'Dislike this idea');
+            downvote.addEventListener('click', () => vote('down', downvote));
+            actions.append(copy, regenerate, specific, upvote, downvote);
             card.append(actions);
             return card;
         }
 
-        async function regenerateIdea(index, result, button) {
+        async function regenerateIdea(index, result, button, feedbackOverride = '') {
             button.disabled = true;
             button.textContent = 'Regenerating…';
             const payload = new FormData(form);
             payload.set('format', result.idea.format);
-            payload.set('feedback', result.validation_errors.join('; ') || 'Make the hook and angle more specific and distinct.');
+            payload.set('feedback', feedbackOverride || result.validation_errors.join('; ') || 'Make the hook and angle more specific and distinct.');
             try {
-                const response = await fetch('/regenerate', { method: 'POST', body: payload });
+                ensureSecureKeyTransport();
+                const response = await fetch('/regenerate', requestOptions(payload));
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
                 lastResponse.ideas[index] = data.ideas[0];
@@ -352,6 +468,20 @@
             } finally {
                 button.disabled = false;
                 button.textContent = 'Regenerate this idea';
+            }
+        }
+
+        async function vote(value, button) {
+            try {
+                const response = await fetch('/feedback', {
+                    method: 'POST',
+                    body: new URLSearchParams({ vote: value })
+                });
+                if (!response.ok) throw new Error('Feedback could not be saved.');
+                button.disabled = true;
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.hidden = false;
             }
         }
 
@@ -384,26 +514,30 @@
             link.click();
             setTimeout(() => URL.revokeObjectURL(link.href), 1000);
         });
+        document.getElementById('printBtn').addEventListener('click', () => window.print());
 
-        document.getElementById('exportHistoryBtn').addEventListener('click', async () => {
-            const token = window.prompt('Enter the HISTORY_EXPORT_TOKEN configured for this app:');
-            if (!token) return;
-            try {
-                const response = await fetch('/history.csv', { headers: { 'X-History-Token': token } });
-                if (!response.ok) {
-                    const data = await response.json();
-                    throw new Error(data.detail || `Request failed (${response.status})`);
-                }
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(await response.blob());
-                link.download = 'generation-history.csv';
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-            } catch (error) {
-                errorMessage.textContent = error.message;
-                errorMessage.hidden = false;
-            }
+        document.getElementById('exportCsvBtn').addEventListener('click', () => {
+            if (!lastResponse) return;
+            const rows = [['title', 'hook', 'angle', 'target_keyword', 'search_intent', 'audience', 'est_word_count', 'format']];
+            lastResponse.ideas.forEach(({ idea }) => rows.push([
+                idea.title, idea.hook, idea.angle, idea.target_keyword, idea.search_intent,
+                idea.audience, idea.est_word_count, idea.format
+            ]));
+            const csv = rows.map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(',')).join('\n');
+            downloadFile(csv, 'blog-idea-briefs.csv', 'text/csv');
         });
+
+        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+            localStorage.removeItem('blogIdeaHistory');
+        });
+
+        function downloadFile(content, filename, type) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob([content], { type }));
+            link.download = filename;
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+        }
     </script>
 </body>
 </html>

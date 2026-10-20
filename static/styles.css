@@ -23,7 +23,7 @@ body {
     font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-button, input, select { font: inherit; }
+button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
 
@@ -69,7 +69,7 @@ h2 { margin: 0; font-size: 1.45rem; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; }
 .form-group { margin-bottom: 16px; }
 label { display: block; margin-bottom: 6px; font-size: 0.9rem; font-weight: 700; }
-input, select {
+input, select, textarea {
     width: 100%;
     min-height: 46px;
     padding: 10px 12px;
@@ -77,6 +77,39 @@ input, select {
     background: white;
     border: 1px solid #cbd5e1;
     border-radius: 9px;
+}
+
+textarea { width: 100%; resize: vertical; }
+
+.starter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.starter-chips button {
+    border: 1px solid var(--border, #cbd5e1);
+    border-radius: 999px;
+    background: transparent;
+    color: inherit;
+    padding: 0.45rem 0.8rem;
+    cursor: pointer;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 0.35rem;
+    line-height: 1.4;
+}
+
+@media print {
+    .form-container, .metrics-panel, .site-header, .toolbar, .idea-actions,
+    .sources-panel, footer {
+        display: none !important;
+    }
+    .results-container { display: block !important; }
+    .idea-card { break-inside: avoid; box-shadow: none; }
 }
 input:focus, select:focus { outline: 3px solid #d8e7ff; border-color: var(--brand); }
 

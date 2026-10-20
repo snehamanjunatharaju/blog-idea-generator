@@ -16,9 +16,9 @@ cp .env.example .env
 uvicorn main:app --reload --port 8001
 ```
 
-Open http://127.0.0.1:8001. The app defaults to automatic provider selection: Anthropic, OpenAI, a reachable local Ollama service, then Demo mode. To force offline mode, set `LLM_PROVIDER=demo`. For Ollama, install and start Ollama and pull a chat model; for duplicate embeddings, also pull the model named by `OLLAMA_EMBED_MODEL` (defaults to `nomic-embed-text`). Set API keys in the environment or a locally managed `.env`; `.env` is ignored by Git.
+Open http://127.0.0.1:8001. The app defaults to Demo mode. For Ollama, install and start Ollama and pull a chat model; for duplicate embeddings, also pull the model named by `OLLAMA_EMBED_MODEL` (defaults to `nomic-embed-text`). Set API keys in the environment or a locally managed `.env`; `.env` is ignored by Git. The UI also supports transient OpenAI or Anthropic keys: they remain in page memory, are sent only with a request, and must use HTTPS outside localhost.
 
-Supported provider values: `auto`, `demo`, `ollama`, `openai`, `anthropic`. Select a model with `LLM_MODEL`. `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are only read by their respective providers.
+Supported provider values: `demo`, `ollama`, `openai`, `anthropic`, and `auto` for explicit environment-based auto-selection. Select a model with `LLM_MODEL`. `OPENAI_API_KEY` and `ANTHROPIC_API_KEY` are only read by their respective providers. Shared Demo runs have a configurable global daily cap; BYOK calls do not use that quota.
 
 ## Pipeline
 
@@ -34,7 +34,8 @@ flowchart LR
     E --> G[Embedding cosine check]
     G -->|Near duplicate| F
     G --> H[Ideas, sources, metrics]
-    H --> I[SQLite run history and CSV export]
+    H --> I[Aggregate SQLite metrics]
+    H --> J[Browser-only history and exports]
 ```
 
 ## Quality checks and evaluation
@@ -57,7 +58,7 @@ python scripts/evaluate.py
 
 The script refreshes [docs/evaluation.md](docs/evaluation.md). Opt into model calls with `--provider ollama`, `--provider openai`, or `--provider anthropic`; configure credentials first. Live model cost is explicitly reported as not measured because token usage and pricing are not collected. Demo metrics test the deterministic pipeline only; they are not a model-quality claim.
 
-Generation history, including the structured ideas and validation results, and aggregate quality metrics are stored in SQLite at `data/history.sqlite3` by default. Aggregate pass rate, duplicate rate, and latency are available at `/metrics`, with a breakdown by provider/model and tone; individual run history is not exposed there. Configure a private `HISTORY_EXPORT_TOKEN` to enable the UI's CSV export at `/history.csv`; the export requires that token and is disabled when unset. Set `DATABASE_PATH` to persist the database outside the container when deploying.
+Only aggregate run metrics, the shared Demo quota, and anonymous vote counts are stored in SQLite at `data/history.sqlite3` by default. Prompts, generated ideas, IP addresses, and provider keys are not stored. A user's optional browser history is stored locally in that browser and can be cleared there. Aggregate pass rate, duplicate rate, latency, and mode breakdown are available at `/metrics`. Set `DATABASE_PATH` to persist aggregate metrics outside the container when deploying.
 
 ## Deployment
 
@@ -76,12 +77,12 @@ For Render, use the included Blueprint at [render.yaml](./render.yaml), or use b
 - The small grounding set contains editorial guidance, not niche-specific research or live keyword-volume data. Sources are displayed in the UI so they are not misrepresented as external factual citations.
 - Embeddings depend on Ollama's embedding endpoint and an installed embedding model; lexical cosine fallback can miss paraphrases.
 - Validation is rule-based and cannot prove factual accuracy, guarantee SEO performance, or ensure every generated idea is useful. Review model-generated claims before publishing.
-- There is no semantic response cache or daily per-user request cap. Per-IP rate limiting is in-process and resets on restart; use a shared limiter for multi-instance deployment.
+- There is no semantic response cache or daily per-user request cap. The shared Demo quota is global to the SQLite database. Per-IP rate limiting is in-process and resets on restart; use a shared limiter for multi-instance deployment.
 - Provider token usage/cost, authentication, durable hosted analytics, screenshots, and the demo GIF are not currently included.
 
 ## Project files
 
-- `main.py` — FastAPI routes, per-IP rate limit, metrics, and CSV export.
+- `main.py` — FastAPI routes, per-IP rate limit, metrics, and shared Demo quota.
 - `idea_engine.py` — providers, structured generation, validation, reflection, and duplicate checks.
 - `knowledge_base.py` — small retrievable editorial knowledge base.
 - `run_history.py` — SQLite persistence and aggregate metrics.
